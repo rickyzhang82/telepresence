@@ -33,6 +33,13 @@ docDescription: >-
   environments, access to instantaneous feedback loops, and highly
   customizable development environments.
 items:
+  - version: 2.20.3
+    date: TBD
+    notes:
+      - type: bugfix
+        title: Allow root daemon to run inside docker container when not in docker mode
+        body: >-
+          Previously the root daemon would not be run when running docker inside a container such as github codespaces since it would assume that the root daemon was already running.
   - version: 2.20.2
     date: 2024-10-21
     notes:
