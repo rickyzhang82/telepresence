@@ -37,9 +37,11 @@ items:
     date: TBD
     notes:
       - type: bugfix
-        title: Allow root daemon to run inside docker container when not in docker mode
+        title: Ensure that Telepresence works with GitHub Codespaces
         body: >-
-          Previously the root daemon would not be run when running docker inside a container such as github codespaces since it would assume that the root daemon was already running.
+          GitHub Codespaces runs in a container, but not as root. Telepresence didn't handle this situation
+          correctly and only started the user daemon. The root daemon was never started.
+        docs: https://github.com/telepresenceio/telepresence/issues/3722
   - version: 2.20.2
     date: 2024-10-21
     notes:
