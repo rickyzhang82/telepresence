@@ -364,19 +364,21 @@ func newSession(c context.Context, mi *rpc.OutboundInfo, mc connector.ManagerPro
 	dlog.Debugf(c, "Creating session with id %v", mi.Session)
 
 	s := &Session{
-		handlers:           tunnel.NewPool(),
-		rndSource:          rand.NewSource(time.Now().UnixNano()),
-		session:            mi.Session,
-		namespace:          mi.Namespace,
-		managerClient:      mc,
-		managerVersion:     ver,
-		subnetViaWorkloads: mi.SubnetViaWorkloads,
-		proxyClusterPods:   true,
-		proxyClusterSvcs:   true,
-		vifReady:           make(chan error, 2),
-		config:             cfg,
-		done:               make(chan struct{}),
-		podDaemon:          isPodDaemon,
+		handlers:              tunnel.NewPool(),
+		rndSource:             rand.NewSource(time.Now().UnixNano()),
+		session:               mi.Session,
+		namespace:             mi.Namespace,
+		managerClient:         mc,
+		managerVersion:        ver,
+		subnetViaWorkloads:    mi.SubnetViaWorkloads,
+		proxyClusterPods:      true,
+		proxyClusterSvcs:      true,
+		vifReady:              make(chan error, 2),
+		config:                cfg,
+		done:                  make(chan struct{}),
+		podDaemon:             isPodDaemon,
+		localTranslationTable: xsync.NewMapOf[iputil.IPKey, net.IP](),
+		virtualIPs:            xsync.NewMapOf[iputil.IPKey, agentVIP](),
 	}
 	s.alsoProxySubnets, err = validateSubnets("also-proxy", mi.AlsoProxySubnets, s.alsoProxyVia)
 	if err != nil {
@@ -1019,20 +1021,6 @@ func (s *Session) run(c context.Context, initErrs chan error) error {
 }
 
 func (s *Session) Start(c context.Context, g *dgroup.Group) error {
-	cancelDNSLock := sync.Mutex{}
-	cancelDNS := func() {}
-
-	if !s.podDaemon {
-		g.Go("network", func(ctx context.Context) error {
-			defer func() {
-				cancelDNSLock.Lock()
-				cancelDNS()
-				cancelDNSLock.Unlock()
-			}()
-			return s.watchClusterInfo(ctx)
-		})
-	}
-
 	if rmc, ok := s.managerClient.(interface{ RealManagerClient() manager.ManagerClient }); ok {
 		clusterCfg := client.GetConfig(c).Cluster()
 		if clusterCfg.AgentPortForward && clusterCfg.ConnectFromRootDaemon {
@@ -1052,6 +1040,18 @@ func (s *Session) Start(c context.Context, g *dgroup.Group) error {
 	if s.podDaemon {
 		return nil
 	}
+
+	cancelDNSLock := sync.Mutex{}
+	cancelDNS := func() {}
+
+	g.Go("network", func(ctx context.Context) error {
+		defer func() {
+			cancelDNSLock.Lock()
+			cancelDNS()
+			cancelDNSLock.Unlock()
+		}()
+		return s.watchClusterInfo(ctx)
+	})
 
 	if s.agentClients == nil && len(s.subnetViaWorkloads) > 0 {
 		return fmt.Errorf("--proxy-via can only be used when cluster.agentPortForward is enabled")
@@ -1139,8 +1139,6 @@ func (s *Session) activateProxyViaWorkloads(ctx context.Context) error {
 		return fmt.Errorf("unable to parse configuration value cluster.virtualIPSubnet: %w", err)
 	}
 	s.vipGenerator = vip.NewGenerator(vipSubnet)
-	s.localTranslationTable = xsync.NewMapOf[iputil.IPKey, net.IP]()
-	s.virtualIPs = xsync.NewMapOf[iputil.IPKey, agentVIP]()
 	s.localTranslationSubnets = make([]agentSubnet, sl)
 	for _, wlName := range s.consolidateProxyViaWorkloads(ctx) {
 		dlog.Debugf(ctx, "Ensuring proxy-via agent in %s", wlName)
@@ -1250,10 +1248,11 @@ func (s *Session) applyConfig(ctx context.Context) error {
 	return client.MergeAndReplace(ctx, s.config, cfg, true)
 }
 
-func (s *Session) waitForAgentIP(ctx context.Context, request *rpc.WaitForAgentIPRequest) (*empty.Empty, error) {
+func (s *Session) waitForAgentIP(ctx context.Context, request *rpc.WaitForAgentIPRequest) (*rpc.WaitForAgentIPResponse, error) {
 	if s.agentClients == nil {
 		return nil, status.Error(codes.Unavailable, "")
 	}
+	ip := net.IP(request.Ip)
 	err := s.agentClients.WaitForIP(ctx, request.Timeout.AsDuration(), request.Ip)
 	switch {
 	case err == nil:
@@ -1264,7 +1263,13 @@ func (s *Session) waitForAgentIP(ctx context.Context, request *rpc.WaitForAgentI
 	default:
 		err = status.Error(codes.Internal, err.Error())
 	}
-	return &empty.Empty{}, err
+	if err == nil {
+		ip, err = s.maybeGetVirtualIP(ctx, ip)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &rpc.WaitForAgentIPResponse{LocalIp: ip}, nil
 }
 
 func (s *Session) Done() <-chan struct{} {

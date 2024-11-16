@@ -8,6 +8,12 @@
 GitHub Codespaces runs in a container, but not as root. Telepresence didn't handle this situation correctly and only started the user daemon. The root daemon was never started.
 </div>
 
+## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">[Mounts not working correctly when connected with --proxy-via](https://github.com/telepresenceio/telepresence/issues/3715)</div></div>
+<div style="margin-left: 15px">
+
+A mount would try to connect to the sftp/ftp server using the original (cluster side) IP although that IP was translated into a virtual IP when using `--proxy-via`.
+</div>
+
 ## Version 2.20.2 <span style="font-size: 16px;">(October 21)</span>
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Crash in traffic-manager configured with agentInjector.enabled=false</div></div>
 <div style="margin-left: 15px">
