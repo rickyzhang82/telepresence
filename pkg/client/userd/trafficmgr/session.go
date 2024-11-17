@@ -240,7 +240,7 @@ func NewSession(
 			return ctx, nil, connectError(rpc.ConnectInfo_DAEMON_FAILED, err)
 		}
 		if !rootRunning {
-			return ctx, nil, connectError(rpc.ConnectInfo_DAEMON_FAILED, errors.New("rot daemon is not running"))
+			return ctx, nil, connectError(rpc.ConnectInfo_DAEMON_FAILED, errors.New("root daemon is not running"))
 		}
 
 		if client.GetConfig(ctx).Cluster().ConnectFromRootDaemon {
