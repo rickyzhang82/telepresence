@@ -34,7 +34,7 @@ docDescription: >-
   customizable development environments.
 items:
   - version: 2.20.3
-    date: TBD
+    date: 2024-11-18
     notes:
       - type: bugfix
         title: Ensure that Telepresence works with GitHub Codespaces
