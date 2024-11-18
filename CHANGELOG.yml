@@ -84,6 +84,21 @@ items:
           The Helm chart value <code>workloads</code> now supports the kinds <code>deployments.enabled</code>, <code>statefulSets.enabled</code>, and <code>replicaSets.enabled</code>.
           By default, all three are enabled, but can be disabled by setting the corresponding value to <code>false</code>.
           When disabled, the traffic-manager will ignore workloads of a corresponding kind, and Telepresence will not be able to intercept them.
+  - version: 2.20.3
+    date: 2024-11-18
+    notes:
+      - type: bugfix
+        title: Ensure that Telepresence works with GitHub Codespaces
+        body: >-
+          GitHub Codespaces runs in a container, but not as root. Telepresence didn't handle this situation
+          correctly and only started the user daemon. The root daemon was never started.
+        docs: https://github.com/telepresenceio/telepresence/issues/3722
+      - type: bugfix
+        title: Mounts not working correctly when connected with --proxy-via
+        body: >-
+          A mount would try to connect to the sftp/ftp server using the original (cluster side) IP although that
+          IP was translated into a virtual IP when using `--proxy-via`.
+        docs: https://github.com/telepresenceio/telepresence/issues/3715
   - version: 2.20.2
     date: 2024-10-21
     notes:

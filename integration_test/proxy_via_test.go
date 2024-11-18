@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -178,6 +179,47 @@ func (s *proxyViaSuite) Test_ProxyViaAll() {
 		dlog.Infof(ctx, "Output from echo service %s", out)
 		return err == nil
 	}, 10*time.Second, 2*time.Second)
+}
+
+func (s *proxyViaSuite) Test_ProxyViaAllAndMounts() {
+	if s.IsCI() && runtime.GOOS == "darwin" {
+		s.T().Skip("CI can't do user mounts on darwin")
+	}
+	ctx := s.Context()
+	rq := s.Require()
+	if s.IsIPv6() {
+		ctx = itest.WithConfig(ctx, func(config client.Config) {
+			config.Cluster().VirtualIPSubnet = "abac:0de0::/64"
+		})
+	}
+
+	s.TelepresenceConnect(ctx, "--proxy-via", "all=echo")
+	st := itest.TelepresenceStatusOk(ctx)
+	defer itest.TelepresenceDisconnectOk(ctx)
+	rq.NotNil(st.RootDaemon)
+	rq.Len(st.RootDaemon.Subnets, 1)
+
+	var mountPoint string
+	if runtime.GOOS == "windows" {
+		mountPoint = "T:"
+	} else {
+		var err error
+		mountPoint, err = os.MkdirTemp("", "mount-") // Don't use the testing.Tempdir() because deletion is delayed.
+		s.Require().NoError(err)
+		defer func() {
+			time.AfterFunc(time.Second, func() {
+				_ = os.RemoveAll(mountPoint)
+			})
+		}()
+	}
+
+	itest.TelepresenceOk(ctx, "intercept", "--mount", mountPoint, "echo")
+
+	// Verify that volume mount is present and functional
+	time.Sleep(3 * time.Second) // avoid a stat just when the intercept became active as it sometimes causes a hang
+	fst, err := os.Stat(filepath.Join(mountPoint, "var"))
+	rq.NoError(err, "Stat on <mount point>/var failed")
+	rq.True(fst.IsDir())
 }
 
 func (s *proxyViaSuite) Test_NeverProxySubnetIsOmitted() {

@@ -108,7 +108,7 @@ func (rd *InProcSession) WaitForNetwork(ctx context.Context, _ *empty.Empty, _ .
 	return &empty.Empty{}, nil
 }
 
-func (rd *InProcSession) WaitForAgentIP(ctx context.Context, request *rpc.WaitForAgentIPRequest, _ ...grpc.CallOption) (*empty.Empty, error) {
+func (rd *InProcSession) WaitForAgentIP(ctx context.Context, request *rpc.WaitForAgentIPRequest, _ ...grpc.CallOption) (*rpc.WaitForAgentIPResponse, error) {
 	return rd.waitForAgentIP(ctx, request)
 }
 

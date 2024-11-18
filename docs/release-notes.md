@@ -36,6 +36,19 @@ The OSS code-base will no longer report usage data to the proprietary collector 
 The Helm chart value <code>workloads</code> now supports the kinds <code>deployments.enabled</code>, <code>statefulSets.enabled</code>, and <code>replicaSets.enabled</code>. By default, all three are enabled, but can be disabled by setting the corresponding value to <code>false</code>. When disabled, the traffic-manager will ignore workloads of a corresponding kind, and Telepresence will not be able to intercept them.
 </div>
 
+## Version 2.20.3 <span style="font-size: 16px;">(November 18)</span>
+## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">[Ensure that Telepresence works with GitHub Codespaces](https://github.com/telepresenceio/telepresence/issues/3722)</div></div>
+<div style="margin-left: 15px">
+
+GitHub Codespaces runs in a container, but not as root. Telepresence didn't handle this situation correctly and only started the user daemon. The root daemon was never started.
+</div>
+
+## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">[Mounts not working correctly when connected with --proxy-via](https://github.com/telepresenceio/telepresence/issues/3715)</div></div>
+<div style="margin-left: 15px">
+
+A mount would try to connect to the sftp/ftp server using the original (cluster side) IP although that IP was translated into a virtual IP when using `--proxy-via`.
+</div>
+
 ## Version 2.20.2 <span style="font-size: 16px;">(October 21)</span>
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Crash in traffic-manager configured with agentInjector.enabled=false</div></div>
 <div style="margin-left: 15px">

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -216,15 +217,18 @@ func (lpf *podIntercepts) start(ctx context.Context, ic *intercept, rd daemon.Da
 	}
 
 	if client.GetConfig(ctx).Cluster().AgentPortForward {
-		// An agent port-forward to the pod with a designated to the PodIP is necessary in order to
+		// An agent port-forward to the pod with a designated to the podIP is necessary to
 		// mount or port-forward to localhost.
-		_, err := rd.WaitForAgentIP(ctx, &daemon.WaitForAgentIPRequest{
+		rsp, err := rd.WaitForAgentIP(ctx, &daemon.WaitForAgentIPRequest{
 			Ip:      iputil.Parse(ic.PodIp),
 			Timeout: durationpb.New(10 * time.Second),
 		})
 		switch grpcStatus.Code(err) {
-		// Unavailable means that the feature disabled. This is OK, the traffic-manager will do the forwarding
-		case grpcCodes.OK, grpcCodes.Unavailable:
+		case grpcCodes.Unavailable: // Unavailable means that the feature disabled. This is OK, the traffic-manager will do the forwarding
+		case grpcCodes.OK:
+			if lip, ok := netip.AddrFromSlice(rsp.LocalIp); ok {
+				ic.PodIp = lip.String()
+			}
 		case grpcCodes.DeadlineExceeded:
 			dlog.Errorf(ctx, "timeout waiting for port-forward to traffic-agent with pod-ip %s", ic.PodIp)
 			return
