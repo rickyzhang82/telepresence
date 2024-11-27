@@ -112,6 +112,11 @@ items:
           and `rollouts.enabled`. All except `rollouts` are enabled by default. The traffic-manager will ignore workloads, and
           Telepresence will not be able to intercept them, if the `enabled` of the corresponding kind is set to `false`.
       - type: feature
+        title: Improved command auto-completion
+        body: >-
+          The auto-completion of namespaces, services, and containers have been added where appropriate, and the default
+          file auto completion has been removed from most commands.
+      - type: feature
         title: Allow Helm chart to be included as a sub-chart
         body: >-
           The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally
