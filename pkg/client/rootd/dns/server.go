@@ -195,13 +195,13 @@ var (
 )
 
 func (s *Server) shouldDoClusterLookup(query string) bool {
-	name := query[:len(query)-1] // skip last dot
 	for _, pf := range excludePrefixes {
-		if strings.HasPrefix(name, pf) {
-			dlog.Debugf(s.ctx, `Cluster DNS excluded by exclude-prefix %q for name %q`, pf, name)
+		if strings.HasPrefix(query, pf) {
+			dlog.Debugf(s.ctx, `Cluster DNS excluded by exclude-prefix %q for name %q`, pf, query)
 			return false
 		}
 	}
+	name := query[:len(query)-1] // skip last dot
 
 	if s.isExcluded(name) {
 		// Reject any host explicitly added to the exclude list.
