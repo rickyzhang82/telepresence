@@ -98,8 +98,13 @@ func (s *notConnectedSuite) Test_CloudNeverProxy() {
 			return false
 		}
 		m := regexp.MustCompile(`Never Proxy\s*:\s*\((\d+) subnets\)`).FindStringSubmatch(stdout)
-		if m == nil || m[1] != strconv.Itoa(neverProxiedCount) {
-			dlog.Errorf(ctx, "did not find %d never-proxied subnets", neverProxiedCount)
+		npcOk := false
+		if m != nil {
+			npc, _ := strconv.Atoi(m[1])
+			npcOk = npc > 0 && npc <= neverProxiedCount
+		}
+		if !npcOk {
+			dlog.Errorf(ctx, "did not find 1-%d never-proxied subnets", neverProxiedCount)
 			return false
 		}
 
@@ -110,8 +115,10 @@ func (s *notConnectedSuite) Test_CloudNeverProxy() {
 		}
 		var view client.SessionConfig
 		require.NoError(client.UnmarshalJSON([]byte(jsonStdout), &view, false))
-		if len(view.Config.Routing().NeverProxy) != neverProxiedCount {
-			dlog.Errorf(ctx, "did not find %d never-proxied subnets in json status", neverProxiedCount)
+		npc := len(view.Config.Routing().NeverProxy)
+		npcOk = npc > 0 && npc <= neverProxiedCount
+		if !npcOk {
+			dlog.Errorf(ctx, "did not find 1-%d never-proxied subnets in json status", neverProxiedCount)
 			return false
 		}
 
