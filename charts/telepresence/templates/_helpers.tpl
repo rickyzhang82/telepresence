@@ -1,3 +1,8 @@
+{{- define "clientRbac-ruleExtras" -}}
+- apiGroups: ["getambassador.io"]
+  resources: ["ispecs"]
+  verbs: ["get"]
+{{- end }}
 {{/*
 Expand the name of the chart.
 */}}
@@ -6,15 +11,7 @@ Expand the name of the chart.
 {{- end }}
 
 {{- define "traffic-manager.name" -}}
-{{- $name := default "traffic-manager" }}
-{{- if .Values.isCI }}
-{{- print $name }}
-{{- else }}
-{{- if ne $name .Release.Name }}
-{{- fail "The name of the release MUST BE traffic-manager" }}
-{{- end }}
-{{- printf "%s" .Release.Name }}
-{{- end -}}
+{{- default .Release.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end -}}
 
 {{- /*
