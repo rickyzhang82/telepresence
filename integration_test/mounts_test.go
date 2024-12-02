@@ -100,7 +100,7 @@ func (s *mountsSuite) TearDownSuite() {
 }
 
 func (s *mountsSuite) Test_MountWrite() {
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS == "windows" {
 		s.T().SkipNow()
 	}
 
@@ -122,7 +122,7 @@ func (s *mountsSuite) Test_MountWrite() {
 
 	mountPoint = filepath.Join(s.T().TempDir(), "data")
 	itest.TelepresenceOk(ctx, "intercept", "hello", "--mount", mountPoint, "--port", "80:80")
-	defer itest.TelepresenceDisconnectOk(ctx)
+	defer itest.TelepresenceOk(ctx, "leave", "hello")
 
 	time.Sleep(2 * time.Second)
 	path = filepath.Join(mountPoint, "data", "hello.txt")
@@ -132,7 +132,7 @@ func (s *mountsSuite) Test_MountWrite() {
 }
 
 func (s *mountsSuite) Test_MountReadOnly() {
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS == "windows" {
 		s.T().SkipNow()
 	}
 	ctx := s.Context()
@@ -141,7 +141,7 @@ func (s *mountsSuite) Test_MountReadOnly() {
 
 	mountPoint := filepath.Join(s.T().TempDir(), "mnt")
 	itest.TelepresenceOk(ctx, "intercept", "hello", "--mount", mountPoint+":ro", "--port", "80:80")
-	defer itest.TelepresenceDisconnectOk(ctx)
+	defer itest.TelepresenceOk(ctx, "leave", "hello")
 	time.Sleep(2 * time.Second)
 	s.Require().Error(os.WriteFile(filepath.Join(mountPoint, "data", "hello.txt"), []byte("hello world\n"), 0o644))
 }
