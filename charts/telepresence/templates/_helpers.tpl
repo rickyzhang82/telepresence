@@ -1,8 +1,3 @@
-{{- define "clientRbac-ruleExtras" -}}
-- apiGroups: ["getambassador.io"]
-  resources: ["ispecs"]
-  verbs: ["get"]
-{{- end }}
 {{/*
 Expand the name of the chart.
 */}}
