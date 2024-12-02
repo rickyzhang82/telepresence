@@ -36,6 +36,12 @@ The OSS code-base will no longer report usage data to the proprietary collector 
 The Helm chart value <code>workloads</code> now supports the kinds <code>deployments.enabled</code>, <code>statefulSets.enabled</code>, and <code>replicaSets.enabled</code>. By default, all three are enabled, but can be disabled by setting the corresponding value to <code>false</code>. When disabled, the traffic-manager will ignore workloads of a corresponding kind, and Telepresence will not be able to intercept them.
 </div>
 
+## <div style="display:flex;"><img src="images/feature.png" alt="feature" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Allow Helm chart to be included as a sub-chart</div></div>
+<div style="margin-left: 15px">
+
+The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart called anything but "traffic-manager".  This restriction has been lifted.
+</div>
+
 ## Version 2.20.3 <span style="font-size: 16px;">(November 18)</span>
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">[Ensure that Telepresence works with GitHub Codespaces](https://github.com/telepresenceio/telepresence/issues/3722)</div></div>
 <div style="margin-left: 15px">
