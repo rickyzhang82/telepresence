@@ -5,8 +5,12 @@ Expand the name of the chart.
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{/*
+Traffic Manager deployment/service name - as of v2.20.3, must be "traffic-manager" to align with code base.
+*/}}
 {{- define "traffic-manager.name" -}}
-{{- default .Release.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- $name := default "traffic-manager" }}
+{{- print $name }}
 {{- end -}}
 
 {{- /*
