@@ -32,6 +32,10 @@ See [Streaming Transitions from SPDY to WebSockets](https://kubernetes.io/blog/2
 	<Title type="feature">Add deployments, statefulSets, replicaSets to workloads Helm chart value</Title>
 	<Body>The Helm chart value <code>workloads</code> now supports the kinds <code>deployments.enabled</code>, <code>statefulSets.enabled</code>, and <code>replicaSets.enabled</code>. By default, all three are enabled, but can be disabled by setting the corresponding value to <code>false</code>. When disabled, the traffic-manager will ignore workloads of a corresponding kind, and Telepresence will not be able to intercept them.</Body>
 </Note>
+<Note>
+	<Title type="feature">Allow Helm chart to be included as a sub-chart</Title>
+	<Body>The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart called anything but "traffic-manager".  This restriction has been lifted.</Body>
+</Note>
 ## Version 2.20.3 <span style={{fontSize:'16px'}}>(November 18)</span>
 <Note>
 	<Title type="bugfix" docs="https://github.com/telepresenceio/telepresence/issues/3722">Ensure that Telepresence works with GitHub Codespaces</Title>

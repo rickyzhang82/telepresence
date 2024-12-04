@@ -70,7 +70,7 @@ items:
           Telepresence will now use WebSockets instead of SPDY when creating port-forwards to the Kubernetes Cluster, and
           will fall back to SPDY when connecting to clusters that don't support SPDY. Use of the deprecated SPDY can be
           forced by setting `cluster.forceSPDY=true` in the `config.yml`.
-          
+
           See [Streaming Transitions from SPDY to WebSockets](https://kubernetes.io/blog/2024/08/20/websockets-transition/)
           for more information about this transition.
       - type: feature
@@ -84,6 +84,12 @@ items:
           The Helm chart value <code>workloads</code> now supports the kinds <code>deployments.enabled</code>, <code>statefulSets.enabled</code>, and <code>replicaSets.enabled</code>.
           By default, all three are enabled, but can be disabled by setting the corresponding value to <code>false</code>.
           When disabled, the traffic-manager will ignore workloads of a corresponding kind, and Telepresence will not be able to intercept them.
+      - type: feature
+        title: Allow Helm chart to be included as a sub-chart
+        body: >-
+          The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally
+          called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart
+          called anything but "traffic-manager".  This restriction has been lifted.
   - version: 2.20.3
     date: 2024-11-18
     notes:
