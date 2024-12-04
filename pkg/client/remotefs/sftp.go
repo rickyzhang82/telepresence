@@ -10,6 +10,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 
+	"github.com/datawire/dlib/dexec"
 	"github.com/datawire/dlib/dgroup"
 	"github.com/datawire/dlib/dlog"
 	"github.com/telepresenceio/telepresence/v2/pkg/dpipe"
@@ -44,17 +45,24 @@ func (m *sftpMounter) Start(ctx context.Context, workload, container, clientMoun
 		defer m.Unlock()
 
 		dlog.Infof(ctx, "Mounting SFTP file system for container %s[%s] (pod %s) at %q", workload, container, podIP, clientMountPoint)
-		defer func() {
-			dlog.Infof(ctx, "Unmounting SFTP file system for container %s[%s] (pod %s) at %q", workload, container, podIP, clientMountPoint)
-			time.Sleep(time.Second)
+		if runtime.GOOS != "windows" {
+			defer func() {
+				dlog.Infof(ctx, "Unmounting SFTP file system for container %s[%s] (pod %s) at %q", workload, container, podIP, clientMountPoint)
+				time.Sleep(time.Second)
 
-			// sshfs sometimes leave the mount point in a bad state. This will clean it up
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
-			defer cancel()
-			umount := proc.CommandContext(ctx, "fusermount", "-uz", clientMountPoint)
-			umount.DisableLogging = true
-			_ = umount.Run()
-		}()
+				// sshfs sometimes leave the mount point in a bad state. This will clean it up
+				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+				defer cancel()
+				var umount *dexec.Cmd
+				if runtime.GOOS == "darwin" {
+					umount = proc.CommandContext(ctx, "umount", "-f", clientMountPoint)
+				} else {
+					umount = proc.CommandContext(ctx, "fusermount", "-uz", clientMountPoint)
+				}
+				umount.DisableLogging = true
+				_ = umount.Run()
+			}()
+		}
 
 		// Retry mount in case it gets disconnected
 		bc := backoff.WithContext(backoff.NewConstantBackOff(3*time.Second), ctx)

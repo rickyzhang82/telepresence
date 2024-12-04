@@ -23,7 +23,7 @@ import (
 
 type podAccess struct {
 	// ctx is a context canceled by the cancel attribute. It must be used by
-	// services that should be canceled when the intercept ends
+	// services that should be canceled when the ingest or intercept ends
 	ctx context.Context
 
 	// wg is the group to wait for after a call to cancel
@@ -39,7 +39,7 @@ type podAccess struct {
 	clientMountPoint string
 
 	// Pointer to the mounter of the remote file system. The mounter
-	// is maintained in the intercept structure
+	// is maintained in the ingest or intercept structure
 	mounter *remotefs.Mounter
 
 	// Use bridged ftp/sftp mount through this local port
@@ -49,8 +49,8 @@ type podAccess struct {
 	readOnly bool
 }
 
-// podAccessKey identifies an intercepted pod. Although an intercept may span multiple
-// pods, the user daemon will always choose exactly one pod with an active intercept to
+// podAccessKey identifies an intercepted pod. Although an ingest or intercept may span multiple
+// pods, the user daemon will always choose exactly one pod with an active ingest or intercept to
 // do port forwards and remote mounts.
 type podAccessKey struct {
 	container string
@@ -58,7 +58,7 @@ type podAccessKey struct {
 }
 
 // The podAccessSync provides pod-specific synchronization for cancellation of port forwards
-// and mounts. Cancellation here does not mean that the ingest/intercept is canceled. It just
+// and mounts. Cancellation here does not mean that the ingest or intercept is canceled. It just
 // means that the given pod is no longer the chosen one. This typically happens when pods
 // are scaled down and then up again.
 type podAccessSync struct {
@@ -75,7 +75,7 @@ type podAccessTracker struct {
 	// alive contains a map of the currently tracked podAccessSync
 	alivePods map[podAccessKey]*podAccessSync
 
-	// A snapshot is recreated for each new intercept snapshot read from the manager.
+	// A snapshot is recreated for each new ingest or intercept snapshot read from the manager.
 	// The set controls which podAccessTracker that are considered alive when cancelUnwanted
 	// is called
 	snapshot map[podAccessKey]struct{}
@@ -150,7 +150,7 @@ func newPodAccessTracker() *podAccessTracker {
 	return &podAccessTracker{alivePods: make(map[podAccessKey]*podAccessSync)}
 }
 
-// start a port forward for the given ingest/intercept and remembers that it's alive.
+// start a port forward for the given ingest or intercept and remembers that it's alive.
 func (lpf *podAccessTracker) start(pa *podAccess) {
 	// The mounts performed here are synced on by podIP + port to keep track of active
 	// mounts. This is not enough in situations when a pod is deleted and another pod
