@@ -17,8 +17,8 @@ import (
 
 const dnsConnTTL = 5 * time.Second
 
-func (s *Session) isForDNS(ip net.IP, port uint16) bool {
-	return s.remoteDnsIP != nil && port == 53 && s.remoteDnsIP.Equal(ip)
+func (s *Session) isForDNS(ip netip.Addr, port uint16) bool {
+	return s.remoteDnsIP == ip && port == 53
 }
 
 // checkRecursion checks that the given IP is not contained in any of the subnets
@@ -47,8 +47,10 @@ func (s *Session) streamCreator(ctx context.Context) tunnel.StreamCreator {
 				return nil, err
 			}
 		}
+
+		destAddr, _ := netip.AddrFromSlice(id.Destination())
 		if p == ipproto.UDP {
-			if s.isForDNS(id.Destination(), id.DestinationPort()) {
+			if s.isForDNS(destAddr, id.DestinationPort()) {
 				pipeId := tunnel.NewConnID(p, id.Source(), s.dnsLocalAddr.IP, id.SourcePort(), uint16(s.dnsLocalAddr.Port))
 				dlog.Tracef(c, "Intercept DNS %s to %s", id, pipeId.DestinationAddr())
 				from, to := tunnel.NewPipe(pipeId, s.session.SessionId)
@@ -57,7 +59,6 @@ func (s *Session) streamCreator(ctx context.Context) tunnel.StreamCreator {
 			}
 		}
 
-		destAddr, _ := netip.AddrFromSlice(id.Destination())
 		if recursionBlockDuration > 0 {
 			dst := netip.AddrPortFrom(destAddr, id.DestinationPort())
 			_, recursive := recursionBlockMap.LoadOrCompute(dst, func() struct{} {

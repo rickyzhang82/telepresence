@@ -116,7 +116,7 @@ type Session struct {
 	// used in conjunction with systemd-resolved. The current macOS and the overriding solution
 	// will dispatch directly to the local DNS Service without going through the TUN device, but
 	// that may change later if we decide to dispatch to the DNS-server in the cluster.
-	remoteDnsIP net.IP
+	remoteDnsIP netip.Addr
 
 	// dnsLocalAddr is the address of the local DNS Service.
 	dnsLocalAddr *net.UDPAddr
@@ -513,11 +513,7 @@ func (s *Session) getNetworkConfig(ctx context.Context) *rpc.NetworkConfig {
 	} else {
 		d.LocalIP = netip.Addr{}
 	}
-	if len(s.remoteDnsIP) > 0 {
-		d.RemoteIP, _ = netip.AddrFromSlice(s.remoteDnsIP)
-	} else {
-		d.RemoteIP = netip.Addr{}
-	}
+	d.RemoteIP = s.remoteDnsIP
 
 	js, _ := client.MarshalJSON(mc)
 	return &rpc.NetworkConfig{
@@ -526,7 +522,7 @@ func (s *Session) getNetworkConfig(ctx context.Context) *rpc.NetworkConfig {
 	}
 }
 
-func (s *Session) configureDNS(dnsIP net.IP, dnsLocalAddr *net.UDPAddr) {
+func (s *Session) configureDNS(dnsIP netip.Addr, dnsLocalAddr *net.UDPAddr) {
 	s.remoteDnsIP = dnsIP
 	s.dnsLocalAddr = dnsLocalAddr
 }

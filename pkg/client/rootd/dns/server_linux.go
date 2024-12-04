@@ -32,7 +32,7 @@ const (
 
 var errResolveDNotConfigured = errors.New("resolved not configured")
 
-func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(net.IP, *net.UDPAddr)) error {
+func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(netip.Addr, *net.UDPAddr)) error {
 	if proc.RunningInContainer() {
 		// Don't bother with systemd-resolved when running in a docker container
 		return s.runOverridingServer(c, dev)

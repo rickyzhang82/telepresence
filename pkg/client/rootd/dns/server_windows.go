@@ -21,7 +21,7 @@ const (
 	recursionTestTimeout    = 1500 * time.Millisecond
 )
 
-func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(net.IP, *net.UDPAddr)) error {
+func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(netip.Addr, *net.UDPAddr)) error {
 	listener, err := newLocalUDPListener(c)
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(net
 	if err != nil {
 		return err
 	}
-	configureDNS(s.RemoteIP.AsSlice(), dnsAddr)
+	configureDNS(s.RemoteIP, dnsAddr)
 
 	var pool FallbackPool
 	if client.GetConfig(c).OSSpecific().Network.DNSWithFallback {
