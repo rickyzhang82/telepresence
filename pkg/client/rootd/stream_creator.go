@@ -74,17 +74,25 @@ func (s *Session) streamCreator(ctx context.Context) tunnel.StreamCreator {
 
 		var err error
 		var tp tunnel.Provider
-		if a, ok := s.getAgentVIP(id); ok {
+		if a, ok := s.getAgentVIP(destAddr); ok {
 			// s.agentClients is never nil when agentVIPs are used.
-			tp = s.agentClients.GetWorkloadClient(a.workload)
-			if tp == nil {
-				return nil, fmt.Errorf("unable to connect to a traffic-agent for workload %q", a.workload)
+			if a.workload != "" {
+				tp = s.agentClients.GetWorkloadClient(a.workload)
+				if tp == nil {
+					return nil, fmt.Errorf("unable to connect to a traffic-agent for workload %q", a.workload)
+				}
+				// Replace the virtual IP with the original destination IP. This will ensure that the agent
+				// dials the original destination when the tunnel is established.
+				id = tunnel.NewConnID(id.Protocol(), id.Source(), a.destinationIP.AsSlice(), id.SourcePort(), id.DestinationPort())
+				dlog.Debugf(c, "Opening proxy-via %s tunnel for id %s", a.workload, id)
+			} else {
+				dlog.Debugf(c, "Translating proxy-via %s to %s", destAddr, a.destinationIP)
+				destAddr = a.destinationIP
+				id = tunnel.NewConnID(id.Protocol(), id.Source(), destAddr.AsSlice(), id.SourcePort(), id.DestinationPort())
 			}
-			// Replace the virtual IP with the original destination IP. This will ensure that the agent
-			// dials the original destination when the tunnel is established.
-			id = tunnel.NewConnID(id.Protocol(), id.Source(), a.destinationIP.AsSlice(), id.SourcePort(), id.DestinationPort())
-			dlog.Debugf(c, "Opening proxy-via %s tunnel for id %s", a.workload, id)
-		} else {
+		}
+
+		if tp == nil {
 			tp = s.getAgentClient(destAddr)
 			if tp != nil {
 				dlog.Debugf(c, "Opening traffic-agent tunnel for id %s", id)
@@ -103,10 +111,9 @@ func (s *Session) streamCreator(ctx context.Context) tunnel.StreamCreator {
 	}
 }
 
-func (s *Session) getAgentVIP(id tunnel.ConnID) (a agentVIP, ok bool) {
+func (s *Session) getAgentVIP(dest netip.Addr) (a agentVIP, ok bool) {
 	if s.virtualIPs != nil {
-		key, _ := netip.AddrFromSlice(id.Destination())
-		a, ok = s.virtualIPs.Load(key)
+		a, ok = s.virtualIPs.Load(dest)
 	}
 	return
 }

@@ -748,6 +748,12 @@ func (s *Session) onClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInf
 	if !ok {
 		return fmt.Errorf("invalid traffic-manager pod ip address")
 	}
+	if s.vipGenerator != nil {
+		dnsAddr, err = s.maybeGetVirtualIP(ctx, dnsAddr)
+		if err != nil {
+			return err
+		}
+	}
 	dnsRouted := false
 	for _, sn := range subnets {
 		if sn.Contains(dnsAddr) {
@@ -760,10 +766,26 @@ func (s *Session) onClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInf
 		// from cluster subnets. But not on darwin systems, because there the DNS is controlled by /etc/resolver
 		// entries appointing the DNS service directly via localhost:<port>.
 		if s.vipGenerator != nil {
-			var err error
-			dnsAddr, err = s.vipGenerator.Next()
+			if !s.dnsServerSubnet.IsValid() {
+				s.createSubnetForDNSOnly(ctx, mgrInfo)
+			}
+			dlog.Infof(ctx, "Adding Service subnet %s (for DNS only)", s.dnsServerSubnet)
+			var wl string
+			for _, snw := range s.subnetViaWorkloads {
+				if sn, err := netip.ParsePrefix(snw.Subnet); err == nil && sn.Contains(dnsAddr) {
+					wl = snw.Workload
+					if wl == "local" {
+						wl = ""
+					}
+				}
+			}
+			s.localTranslationSubnets = append(s.localTranslationSubnets, agentSubnet{
+				Prefix:   s.dnsServerSubnet,
+				workload: wl,
+			})
+			dnsAddr, err = s.maybeGetVirtualIP(ctx, dnsAddr)
 			if err != nil {
-				return nil
+				return err
 			}
 		} else {
 			if !s.dnsServerSubnet.IsValid() {
@@ -1193,17 +1215,20 @@ func (s *Session) consolidateProxyViaWorkloads(ctx context.Context) []string {
 		}
 	}
 
-	wlNames := make([]string, len(desiredVips))
+	wlNames := make([]string, 0, len(desiredVips))
 	lcs := make([]agentSubnet, 0, snCount)
-	i := 0
 	for wlName, sns := range desiredVips {
-		wlNames[i] = wlName
-		i++
+		if wlName == "local" {
+			wlName = ""
+		} else {
+			wlNames = append(wlNames, wlName)
+		}
 		for _, sn := range sns {
 			lcs = append(lcs, agentSubnet{Prefix: sn, workload: wlName})
 		}
 	}
 	s.localTranslationSubnets = lcs
+	dlog.Debugf(ctx, "Local translation subnets: %v", s.localTranslationSubnets)
 	return wlNames
 }
 
@@ -1218,7 +1243,9 @@ func (s *Session) waitForProxyViaWorkloads(ctx context.Context) error {
 	// Need unique workload names
 	ws := make([]string, 0, len(s.subnetViaWorkloads))
 	for _, svw := range s.subnetViaWorkloads {
-		ws = slice.AppendUnique(ws, svw.Workload)
+		if svw.Workload != "local" {
+			ws = slice.AppendUnique(ws, svw.Workload)
+		}
 	}
 	for _, wl := range ws {
 		s.agentClients.SetProxyVia(wl)

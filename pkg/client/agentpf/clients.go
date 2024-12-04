@@ -527,13 +527,12 @@ func (s *clients) updateClients(ctx context.Context, ais []*manager.AgentPodInfo
 	})
 
 	// Ensure that we have at least one client (if at least one agent exists)
-	if s.clients.Size() == 0 && len(aim) > 0 {
-		var ai *manager.AgentPodInfo
-		for _, ai = range aim {
+	if s.clients.Size() == 0 {
+		for _, ai := range aim {
+			k := ai.PodName + "." + ai.Namespace
+			addClient(k, ai)
 			break
 		}
-		k := ai.PodName + "." + ai.Namespace
-		addClient(k, ai)
 	}
 	return nil
 }
