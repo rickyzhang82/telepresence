@@ -209,7 +209,7 @@ func (wf *workloadInfoWatcher) addEvent(
 	wf.resetTicker()
 }
 
-func (wf *workloadInfoWatcher) handleWorkloadsSnapshot(ctx context.Context, wes []workload.WorkloadEvent, initial bool) {
+func (wf *workloadInfoWatcher) handleWorkloadsSnapshot(ctx context.Context, wes []workload.Event, initial bool) {
 	if len(wes) == 0 {
 		if initial {
 			// The initial snapshot may be empty, but must be sent anyway.
@@ -219,6 +219,9 @@ func (wf *workloadInfoWatcher) handleWorkloadsSnapshot(ctx context.Context, wes 
 	}
 	for _, we := range wes {
 		wl := we.Workload
+		if wf.namespace != "" && wl.GetNamespace() != wf.namespace {
+			continue
+		}
 		if w, ok := wf.workloadEvents[wl.GetName()]; ok {
 			if we.Type == workload.EventTypeDelete && w.Type != rpc.WorkloadEvent_DELETED {
 				w.Type = rpc.WorkloadEvent_DELETED

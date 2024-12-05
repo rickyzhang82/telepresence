@@ -25,7 +25,7 @@ import (
 
 type largeFilesSuite struct {
 	itest.Suite
-	itest.NamespacePair
+	itest.TrafficManager
 	name         string
 	serviceCount int
 	mountPoint   []string
@@ -49,14 +49,14 @@ const (
 )
 
 func init() {
-	itest.AddTrafficManagerSuite("", func(h itest.NamespacePair) itest.TestingSuite {
+	itest.AddTrafficManagerSuite("", func(h itest.TrafficManager) itest.TestingSuite {
 		return &largeFilesSuite{
-			Suite:         itest.Suite{Harness: h},
-			NamespacePair: h,
-			name:          "hello",
-			serviceCount:  svcCount,
-			mountPoint:    make([]string, svcCount),
-			largeFiles:    make([]string, svcCount*fileCountPerSvc),
+			Suite:          itest.Suite{Harness: h},
+			TrafficManager: h,
+			name:           "hello",
+			serviceCount:   svcCount,
+			mountPoint:     make([]string, svcCount),
+			largeFiles:     make([]string, svcCount*fileCountPerSvc),
 		}
 	})
 }
@@ -170,7 +170,7 @@ func (s *largeFilesSuite) largeFileIntercepts(ctx context.Context) {
 	wg := sync.WaitGroup{}
 
 	// Start by creating files in the mounted filesystem from entry 1 - fileCountPerSvc for each service.
-	// We leave the first entry empty because we in the next step, we want to create a file parallel to
+	// We leave the first entry empty because in the next step, we want to create a file parallel to
 	// validating the ones we create here so that there is heavy parallel reads and writes.
 	wg.Add(s.ServiceCount() * (fileCountPerSvc - 1))
 	for i := 0; i < s.ServiceCount(); i++ {

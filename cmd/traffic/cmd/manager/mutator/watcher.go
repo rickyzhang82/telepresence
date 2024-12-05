@@ -103,9 +103,9 @@ func (c *configWatcher) isRolloutNeeded(ctx context.Context, wl k8sapi.Workload,
 		return false
 	}
 	if ia, ok := podMeta.GetAnnotations()[agentconfig.InjectAnnotation]; ok {
-		// Annotation controls injection, so no explicit rollout is needed unless the deployment was added after the traffic-manager.
+		// Annotation controls injection, so no explicit rollout is needed unless the deployment was added before the traffic-manager.
 		// If the annotation changes, there will be an implicit rollout anyway.
-		if podMeta.GetCreationTimestamp().After(c.startedAt) {
+		if wl.GetCreationTimestamp().After(c.startedAt) {
 			dlog.Debugf(ctx, "Rollout of %s.%s is not necessary. Pod template has inject annotation %s",
 				wl.GetName(), wl.GetNamespace(), ia)
 			return false
@@ -560,32 +560,24 @@ func (c *configWatcher) StartWatchers(ctx context.Context) error {
 			return err
 		}
 	}
-	if c.dps != nil {
-		for _, si := range c.dps {
-			if err := c.watchWorkloads(ctx, si); err != nil {
-				return err
-			}
+	for _, si := range c.dps {
+		if err := c.watchWorkloads(ctx, si); err != nil {
+			return err
 		}
 	}
-	if c.rss != nil {
-		for _, si := range c.rss {
-			if err := c.watchWorkloads(ctx, si); err != nil {
-				return err
-			}
+	for _, si := range c.rss {
+		if err := c.watchWorkloads(ctx, si); err != nil {
+			return err
 		}
 	}
-	if c.sss != nil {
-		for _, si := range c.sss {
-			if err := c.watchWorkloads(ctx, si); err != nil {
-				return err
-			}
+	for _, si := range c.sss {
+		if err := c.watchWorkloads(ctx, si); err != nil {
+			return err
 		}
 	}
-	if c.rls != nil {
-		for _, si := range c.rls {
-			if err := c.watchWorkloads(ctx, si); err != nil {
-				return err
-			}
+	for _, si := range c.rls {
+		if err := c.watchWorkloads(ctx, si); err != nil {
+			return err
 		}
 	}
 	for _, ci := range c.cms {
@@ -842,13 +834,13 @@ func (c *configWatcher) Start(ctx context.Context) {
 	c.cms = make([]cache.SharedIndexInformer, len(nss))
 	for _, wlKind := range env.EnabledWorkloadKinds {
 		switch wlKind {
-		case workload.DeploymentWorkloadKind:
+		case workload.DeploymentKind:
 			c.dps = make([]cache.SharedIndexInformer, len(nss))
-		case workload.ReplicaSetWorkloadKind:
+		case workload.ReplicaSetKind:
 			c.rss = make([]cache.SharedIndexInformer, len(nss))
-		case workload.StatefulSetWorkloadKind:
+		case workload.StatefulSetKind:
 			c.sss = make([]cache.SharedIndexInformer, len(nss))
-		case workload.RolloutWorkloadKind:
+		case workload.RolloutKind:
 			c.rls = make([]cache.SharedIndexInformer, len(nss))
 		}
 	}

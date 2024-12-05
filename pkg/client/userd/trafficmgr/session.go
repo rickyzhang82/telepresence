@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
+	"github.com/puzpuzpuz/xsync/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -117,10 +117,18 @@ type session struct {
 
 	workloadSubscribers map[uuid.UUID]chan struct{}
 
-	// currentInterceptsLock ensures that all accesses to currentIntercepts, currentMatchers,
+	// currentIngests is tracks the ingests that are active in this session.
+	currentIngests *xsync.MapOf[ingestKey, *ingest]
+
+	ingestTracker *podAccessTracker
+
+	// currentInterceptsLock ensures that all accesses to currentAgents, currentIntercepts, currentMatchers,
 	// currentAPIServers, interceptWaiters, and ingressInfo are synchronized
 	//
 	currentInterceptsLock sync.Mutex
+
+	// currentAgents is the latest snapshot returned by the agents watcher.
+	currentAgents []*manager.AgentInfo
 
 	// currentIntercepts is the latest snapshot returned by the intercept watcher. It
 	// is keyeed by the intercept ID
@@ -414,6 +422,9 @@ func connectMgr(
 			Version:   client.Version(),
 		})
 		if err != nil {
+			if st, ok := status.FromError(err); ok && st.Code() == codes.FailedPrecondition {
+				return nil, errcat.User.New(st.Message())
+			}
 			return nil, client.CheckTimeout(ctx, fmt.Errorf("manager.ArriveAsClient: %w", err))
 		}
 		if err = SaveSessionInfoToUserCache(ctx, daemonID, si); err != nil {
@@ -444,6 +455,8 @@ func connectMgr(
 		managerName:        managerName,
 		managerVersion:     managerVersion,
 		sessionInfo:        si,
+		currentIngests:     xsync.NewMapOf[ingestKey, *ingest](),
+		ingestTracker:      newPodAccessTracker(),
 		workloads:          make(map[string]map[workloadInfoKey]workloadInfo),
 		interceptWaiters:   make(map[string]*awaitIntercept),
 		isPodDaemon:        cr.IsPodDaemon,
@@ -533,6 +546,7 @@ func (s *session) Epilog(ctx context.Context) {
 
 func (s *session) StartServices(g *dgroup.Group) {
 	g.Go("remain", s.remainLoop)
+	g.Go("agents", s.watchAgentsLoop)
 	g.Go("intercept-port-forward", s.watchInterceptsHandler)
 	g.Go("dial-request-watcher", s.dialRequestWatcher)
 }
@@ -578,7 +592,8 @@ func (s *session) ApplyConfig(ctx context.Context) error {
 func (s *session) getInfosForWorkloads(
 	namespaces []string,
 	iMap map[string][]*manager.InterceptInfo,
-	sMap map[string]*rpc.WorkloadInfo_Sidecar,
+	gMap map[string][]*rpc.IngestInfo,
+	sMap map[string]string,
 	filter rpc.ListRequest_Filter,
 ) []*rpc.WorkloadInfo {
 	wiMap := make(map[string]*rpc.WorkloadInfo)
@@ -595,10 +610,17 @@ func (s *session) getInfosForWorkloads(
 		}
 
 		var ok bool
-		if wlInfo.InterceptInfos, ok = iMap[name]; !ok && filter <= rpc.ListRequest_INTERCEPTS {
-			return
+		filterMatch := rpc.ListRequest_EVERYTHING
+		if wlInfo.InterceptInfos, ok = iMap[name]; !ok {
+			filterMatch &= ^rpc.ListRequest_INTERCEPTS
 		}
-		if wlInfo.Sidecar, ok = sMap[name]; !ok && filter <= rpc.ListRequest_INSTALLED_AGENTS {
+		if wlInfo.IngestInfos, ok = gMap[name]; !ok {
+			filterMatch &= ^rpc.ListRequest_INGESTS
+		}
+		if wlInfo.AgentVersion, ok = sMap[name]; !ok {
+			filterMatch &= ^rpc.ListRequest_INSTALLED_AGENTS
+		}
+		if filter != 0 && filter&filterMatch == 0 {
 			return
 		}
 		wiMap[fmt.Sprintf("%s:%s.%s", kind, name, namespace)] = wlInfo
@@ -696,7 +718,8 @@ func (s *session) WorkloadInfoSnapshot(
 	is := s.getCurrentIntercepts()
 
 	var nss []string
-	if filter == rpc.ListRequest_INTERCEPTS {
+	var sMap map[string]string
+	if filter&(rpc.ListRequest_INTERCEPTS|rpc.ListRequest_INGESTS|rpc.ListRequest_INSTALLED_AGENTS) != 0 {
 		// Special case, we don't care about namespaces in general. Instead, we use the connected namespace
 		nss = []string{s.Namespace}
 	} else {
@@ -713,8 +736,14 @@ func (s *session) WorkloadInfoSnapshot(
 		dlog.Debug(ctx, "No namespaces are mapped")
 		return &rpc.WorkloadInfoSnapshot{}, nil
 	}
+	if len(nss) == 1 && nss[0] == s.Namespace {
+		cas := s.getCurrentAgents()
+		sMap = make(map[string]string, len(cas))
+		for _, a := range cas {
+			sMap[a.Name] = a.Version
+		}
+	}
 	s.ensureWatchers(ctx, nss)
-
 	iMap := make(map[string][]*manager.InterceptInfo, len(is))
 nextIs:
 	for _, i := range is {
@@ -725,19 +754,13 @@ nextIs:
 			}
 		}
 	}
+	gMap := make(map[string][]*rpc.IngestInfo, s.currentIngests.Size())
+	s.currentIngests.Range(func(key ingestKey, ig *ingest) bool {
+		gMap[key.workload] = append(gMap[key.workload], ig.response())
+		return true
+	})
 
-	sMap := make(map[string]*rpc.WorkloadInfo_Sidecar)
-	for _, ns := range nss {
-		for k, v := range s.getCurrentSidecarsInNamespace(ctx, ns) {
-			data, err := json.Marshal(v)
-			if err != nil {
-				continue
-			}
-			sMap[k] = &rpc.WorkloadInfo_Sidecar{Json: data}
-		}
-	}
-
-	workloadInfos := s.getInfosForWorkloads(nss, iMap, sMap, filter)
+	workloadInfos := s.getInfosForWorkloads(nss, iMap, gMap, sMap, filter)
 	return &rpc.WorkloadInfoSnapshot{Workloads: workloadInfos}, nil
 }
 
@@ -841,6 +864,7 @@ func (s *session) status(c context.Context, initial bool) *rpc.ConnectInfo {
 		ConnectionName:   s.daemonID.Name,
 		KubeFlags:        s.OriginalFlagMap,
 		Namespace:        s.Namespace,
+		Ingests:          s.getCurrentIngests(),
 		Intercepts:       &manager.InterceptInfoSnapshot{Intercepts: s.getCurrentInterceptInfos()},
 		ManagerVersion: &manager.VersionInfo2{
 			Name:    s.managerName,
@@ -932,7 +956,7 @@ func (s *session) Uninstall(ctx context.Context, ur *rpc.UninstallRequest) (*com
 		return nil, status.Error(codes.InvalidArgument, "invalid uninstall request")
 	}
 
-	_ = s.ClearIntercepts(ctx)
+	_ = s.ClearIngestsAndIntercepts(ctx)
 	clearAgentsConfigMap := func(ns string) error {
 		cm, err := loadAgentConfigMap(ns)
 		if err != nil {
@@ -1112,20 +1136,20 @@ func (s *session) localWorkloadsWatcher(ctx context.Context, namespace string, s
 		fc = informer.GetFactory(ctx, namespace)
 	}
 
-	enabledWorkloadKinds := make([]workload.WorkloadKind, len(knownWorkloadKinds.Kinds))
+	enabledWorkloadKinds := make([]workload.Kind, len(knownWorkloadKinds.Kinds))
 	for i, kind := range knownWorkloadKinds.Kinds {
 		switch kind {
 		case manager.WorkloadInfo_DEPLOYMENT:
-			enabledWorkloadKinds[i] = workload.DeploymentWorkloadKind
+			enabledWorkloadKinds[i] = workload.DeploymentKind
 			workload.StartDeployments(ctx, namespace)
 		case manager.WorkloadInfo_REPLICASET:
-			enabledWorkloadKinds[i] = workload.ReplicaSetWorkloadKind
+			enabledWorkloadKinds[i] = workload.ReplicaSetKind
 			workload.StartReplicaSets(ctx, namespace)
 		case manager.WorkloadInfo_STATEFULSET:
-			enabledWorkloadKinds[i] = workload.StatefulSetWorkloadKind
+			enabledWorkloadKinds[i] = workload.StatefulSetKind
 			workload.StartStatefulSets(ctx, namespace)
 		case manager.WorkloadInfo_ROLLOUT:
-			enabledWorkloadKinds[i] = workload.RolloutWorkloadKind
+			enabledWorkloadKinds[i] = workload.RolloutKind
 			workload.StartRollouts(ctx, namespace)
 			af := fc.GetArgoRolloutsInformerFactory()
 			af.Start(ctx.Done())
@@ -1191,6 +1215,9 @@ func (s *session) workloadsWatcher(ctx context.Context, namespace string, synced
 	}()
 	wlc, err := s.managerClient.WatchWorkloads(ctx, &manager.WorkloadEventsRequest{SessionInfo: s.sessionInfo, Namespace: namespace})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.FailedPrecondition {
+			return errcat.User.New(st.Message())
+		}
 		return err
 	}
 

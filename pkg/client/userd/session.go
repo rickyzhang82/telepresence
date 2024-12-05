@@ -53,9 +53,9 @@ type Session interface {
 	RemoveIntercept(context.Context, string) error
 	NewCreateInterceptRequest(*manager.InterceptSpec) *manager.CreateInterceptRequest
 
-	AddInterceptor(string, *rpc.Interceptor) error
+	AddInterceptor(context.Context, string, *rpc.Interceptor) error
 	RemoveInterceptor(string) error
-	ClearIntercepts(context.Context) error
+	ClearIngestsAndIntercepts(context.Context) error
 
 	GetInterceptInfo(string) *manager.InterceptInfo
 	GetInterceptSpec(string) *manager.InterceptSpec
@@ -95,6 +95,9 @@ type Session interface {
 	Remain(ctx context.Context) error
 	Epilog(ctx context.Context)
 	Done() <-chan struct{}
+	Ingest(context.Context, *rpc.IngestRequest) (*rpc.IngestInfo, error)
+	GetIngest(*rpc.IngestIdentifier) (*rpc.IngestInfo, error)
+	LeaveIngest(context.Context, *rpc.IngestIdentifier) (*rpc.IngestInfo, error)
 }
 
 type NewSessionFunc func(context.Context, ConnectRequest, *client.Kubeconfig) (context.Context, Session, *connector.ConnectInfo)

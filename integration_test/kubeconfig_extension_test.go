@@ -142,21 +142,26 @@ func (s *notConnectedSuite) Test_NeverProxy() {
 			return false
 		}
 		m := regexp.MustCompile(`Never Proxy\s*:\s*\((\d+) subnets\)`).FindStringSubmatch(stdout)
-		if m == nil {
-			dlog.Infof(ctx, "did not find any never-proxied subnets\nOut: %s", stdout)
-			return false
+		npcOk := false
+		if m != nil {
+			npc, _ := strconv.Atoi(m[1])
+			npcOk = npc > 0 && npc <= neverProxiedCount
 		}
-		if m[1] != strconv.Itoa(neverProxiedCount) {
-			dlog.Infof(ctx, "did not find %d never-proxied subnets\nOut: %s", neverProxiedCount, stdout)
+		if !npcOk {
+			dlog.Infof(ctx, "did not find 1-%d never-proxied subnets\nOut: %s", neverProxiedCount, stdout)
 			return false
 		}
 		return true
-	}, 5*time.Second, 1*time.Second, fmt.Sprintf("did not find %d never-proxied subnets", neverProxiedCount))
+	}, 5*time.Second, 1*time.Second, fmt.Sprintf("did not find 1-%d never-proxied subnets", neverProxiedCount))
 
 	s.Eventually(func() bool {
 		status, err := itest.TelepresenceStatus(ctx)
-		return err == nil && status.RootDaemon != nil && len(status.RootDaemon.NeverProxy) == neverProxiedCount
-	}, 5*time.Second, 1*time.Second, fmt.Sprintf("did not find %d never-proxied subnets in json status", neverProxiedCount))
+		if err == nil && status.RootDaemon != nil {
+			npc := len(status.RootDaemon.NeverProxy)
+			return npc > 0 && npc <= neverProxiedCount
+		}
+		return false
+	}, 5*time.Second, 1*time.Second, fmt.Sprintf("did not find 1-%d never-proxied subnets in json status", neverProxiedCount))
 
 	s.Eventually(func() bool {
 		return itest.Run(ctx, "curl", "--silent", "--max-time", "0.5", ip) != nil

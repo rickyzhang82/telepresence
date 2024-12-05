@@ -22,13 +22,13 @@
       link: concepts/intercepts
 - title: How do I...
   items:
-    - title: Intercept a service in your own environment
+    - title: Code and debug an application locally
       link: howtos/intercepts
     - title: Proxy outbound traffic to my cluster
       link: howtos/outbound
     - title: Work with large clusters
       link: howtos/large-clusters
-    - title: Host a cluster in a local VM
+    - title: Host a cluster in Docker or a VM
       link: howtos/cluster-in-vm
 - title: Technical reference
   items:

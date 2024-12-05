@@ -8,9 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
+
+	"github.com/datawire/dlib/dexec"
 	"github.com/datawire/dlib/dgroup"
 	"github.com/datawire/dlib/dlog"
-	"github.com/telepresenceio/telepresence/v2/pkg/client"
 	"github.com/telepresenceio/telepresence/v2/pkg/dpipe"
 	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
 	"github.com/telepresenceio/telepresence/v2/pkg/proc"
@@ -26,7 +28,7 @@ func NewSFTPMounter(iceptWG, podWG *sync.WaitGroup) Mounter {
 	return &sftpMounter{iceptWG: iceptWG, podWG: podWG}
 }
 
-func (m *sftpMounter) Start(ctx context.Context, id, clientMountPoint, mountPoint string, podIP net.IP, port uint16) error {
+func (m *sftpMounter) Start(ctx context.Context, workload, container, clientMountPoint, mountPoint string, podIP net.IP, port uint16, ro bool) error {
 	ctx = dgroup.WithGoroutineName(ctx, iputil.JoinIpPort(podIP, port))
 
 	// The mount is terminated and restarted when the intercept pod changes, so we
@@ -42,11 +44,29 @@ func (m *sftpMounter) Start(ctx context.Context, id, clientMountPoint, mountPoin
 		m.Lock()
 		defer m.Unlock()
 
-		dlog.Infof(ctx, "Mounting SFTP file system for intercept %q (pod %s) at %q", id, podIP, clientMountPoint)
-		defer dlog.Infof(ctx, "Unmounting SFTP file system for intercept %q (pod %s) at %q", id, podIP, clientMountPoint)
+		dlog.Infof(ctx, "Mounting SFTP file system for container %s[%s] (pod %s) at %q", workload, container, podIP, clientMountPoint)
+		if runtime.GOOS != "windows" {
+			defer func() {
+				dlog.Infof(ctx, "Unmounting SFTP file system for container %s[%s] (pod %s) at %q", workload, container, podIP, clientMountPoint)
+				time.Sleep(time.Second)
+
+				// sshfs sometimes leave the mount point in a bad state. This will clean it up
+				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+				defer cancel()
+				var umount *dexec.Cmd
+				if runtime.GOOS == "darwin" {
+					umount = proc.CommandContext(ctx, "umount", "-f", clientMountPoint)
+				} else {
+					umount = proc.CommandContext(ctx, "fusermount", "-uz", clientMountPoint)
+				}
+				umount.DisableLogging = true
+				_ = umount.Run()
+			}()
+		}
 
 		// Retry mount in case it gets disconnected
-		err := client.Retry(ctx, "sshfs", func(ctx context.Context) error {
+		bc := backoff.WithContext(backoff.NewConstantBackOff(3*time.Second), ctx)
+		err := backoff.Retry(func() error {
 			sshfsArgs := []string{
 				"-F", "none", // don't load the user's config file
 				"-f", // foreground operation
@@ -58,6 +78,9 @@ func (m *sftpMounter) Start(ctx context.Context, id, clientMountPoint, mountPoin
 				// mount directives
 				"-o", "follow_symlinks",
 				"-o", "allow_root", // needed to make --docker-run work as docker runs as root
+			}
+			if ro {
+				sshfsArgs = append(sshfsArgs, "-o", "ro")
 			}
 
 			useIPv6 := len(podIP) == 16
@@ -92,16 +115,8 @@ func (m *sftpMounter) Start(ctx context.Context, id, clientMountPoint, mountPoin
 			} else {
 				err = proc.Run(ctx, nil, exe, sshfsArgs...)
 			}
-			time.Sleep(time.Second)
-
-			// sshfs sometimes leave the mount point in a bad state. This will clean it up
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
-			defer cancel()
-			umount := proc.CommandContext(ctx, "fusermount", "-uz", clientMountPoint)
-			umount.DisableLogging = true
-			_ = umount.Run()
 			return err
-		}, 3*time.Second, 6*time.Second)
+		}, bc)
 		if err != nil {
 			dlog.Error(ctx, err)
 		}

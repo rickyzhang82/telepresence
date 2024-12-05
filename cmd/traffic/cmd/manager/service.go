@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	dns2 "github.com/miekg/dns"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/exp/maps"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -158,6 +160,26 @@ func (s *service) GetAgentImageFQN(ctx context.Context, _ *empty.Empty) (*rpc.Ag
 	return nil, status.Error(codes.Unavailable, "")
 }
 
+func (s *service) GetAgentConfig(ctx context.Context, request *rpc.AgentConfigRequest) (*rpc.AgentConfigResponse, error) {
+	dlog.Debug(ctx, "GetAgentConfig called")
+	ctx = managerutil.WithSessionInfo(ctx, request.Session)
+	sessionID := request.GetSession().GetSessionId()
+	clientInfo := s.state.GetClient(sessionID)
+	if clientInfo == nil {
+		return nil, status.Errorf(codes.NotFound, "Client session %q not found", sessionID)
+	}
+	scs, err := s.State().GetOrGenerateAgentConfig(ctx, request.Name, clientInfo.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	r := rpc.AgentConfigResponse{}
+	r.Data, err = scs.Marshal()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &r, nil
+}
+
 func (s *service) GetLicense(context.Context, *empty.Empty) (*rpc.License, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
@@ -179,6 +201,10 @@ func (s *service) GetTelepresenceAPI(ctx context.Context, e *empty.Empty) (*rpc.
 // ArriveAsClient establishes a session between a client and the Manager.
 func (s *service) ArriveAsClient(ctx context.Context, client *rpc.ClientInfo) (*rpc.SessionInfo, error) {
 	dlog.Debugf(ctx, "ArriveAsClient called, namespace: %s", client.Namespace)
+
+	if !s.State().ManagesNamespace(ctx, client.Namespace) {
+		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("namespace %s is not managed", client.Namespace))
+	}
 
 	if val := validateClient(client); val != "" {
 		return nil, status.Error(codes.InvalidArgument, val)
@@ -204,6 +230,11 @@ func (s *service) ArriveAsAgent(ctx context.Context, agent *rpc.AgentInfo) (*rpc
 		return nil, status.Error(codes.InvalidArgument, val)
 	}
 
+	for _, ek := range getExcludedEnvVars(ctx) {
+		for _, cn := range agent.Containers {
+			delete(cn.Environment, ek)
+		}
+	}
 	sessionID := s.state.AddAgent(agent, s.clock.Now())
 	mutator.GetMap(ctx).Whitelist(agent.PodName, agent.Namespace)
 
@@ -328,113 +359,65 @@ func (s *service) WatchAgentPods(session *rpc.SessionInfo, stream rpc.Manager_Wa
 	}
 }
 
-// WatchAgents notifies a client of the set of known Agents. If the caller is a client, then the
-// only agents in the client's connected namespace are returned.
+// WatchAgents notifies a client of the set of known Agents in the connected namespace.
 func (s *service) WatchAgents(session *rpc.SessionInfo, stream rpc.Manager_WatchAgentsServer) error {
 	ctx := managerutil.WithSessionInfo(stream.Context(), session)
 	dlog.Debug(ctx, "WatchAgents called")
+	clientInfo := s.state.GetClient(session.SessionId)
+	if clientInfo == nil {
+		return status.Errorf(codes.NotFound, "Client session %q not found", session.SessionId)
+	}
+	ns := clientInfo.Namespace
+	return s.watchAgents(ctx, func(_ string, a *rpc.AgentInfo) bool { return a.Namespace == ns }, stream)
+}
 
-	snapshotCh := s.state.WatchAgents(ctx, nil)
-	sessionDone, err := s.state.SessionDone(session.GetSessionId())
-	if err != nil {
-		return err
-	}
-	for {
-		select {
-		case snapshot, ok := <-snapshotCh:
-			if !ok {
-				// The request has been canceled.
-				dlog.Debug(ctx, "WatchAgents request cancelled")
-				return nil
-			}
-			as := snapshot.State
-			agents := make([]*rpc.AgentInfo, len(as))
-			names := make([]string, len(as))
-			i := 0
-			for _, a := range as {
-				agents[i] = a
-				names[i] = a.Name + "." + a.Namespace
-				i++
-			}
-			resp := &rpc.AgentInfoSnapshot{
-				Agents: agents,
-			}
-			dlog.Debugf(ctx, "WatchAgents sending update %v", names)
-			if err := stream.Send(resp); err != nil {
-				return err
-			}
-		case <-sessionDone:
-			// Manager believes this session has ended.
-			dlog.Debug(ctx, "WatchAgents session cancelled")
-			return nil
-		}
-	}
+// WatchAgentsNS notifies a client of the set of known Agents in the namespaces given in the request.
+func (s *service) WatchAgentsNS(request *rpc.AgentsRequest, stream rpc.Manager_WatchAgentsNSServer) error {
+	ctx := managerutil.WithSessionInfo(stream.Context(), request.Session)
+	dlog.Debug(ctx, "WatchAgentsNS called")
+	return s.watchAgents(ctx, func(_ string, a *rpc.AgentInfo) bool { return slices.Contains(request.Namespaces, a.Namespace) }, stream)
 }
 
 func infosEqual(a, b *rpc.AgentInfo) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Name != b.Name || a.Namespace != b.Namespace || a.Product != b.Product || a.Version != b.Version {
+		return false
+	}
 	ams := a.Mechanisms
 	bms := b.Mechanisms
 	if len(ams) != len(bms) {
 		return false
 	}
-	ae := a.Environment
-	be := b.Environment
-	if len(ae) != len(be) {
-		return false
-	}
-	if a.Name != b.Name || a.Namespace != b.Namespace || a.Product != b.Product || a.Version != b.Version {
-		return false
-	}
 	for i, am := range ams {
 		bm := bms[i]
-		if am.Name != bm.Name || am.Product != bm.Product || am.Version != bm.Version {
+		if am == nil || bm == nil {
+			if am != bm {
+				return false
+			}
+		} else if am.Name != bm.Name || am.Product != bm.Product || am.Version != bm.Version {
 			return false
 		}
 	}
-	for k, av := range ae {
-		if bv, ok := be[k]; !(ok && av == bv) {
-			return false
+	return maps.EqualFunc(a.Containers, b.Containers, func(ac *rpc.AgentInfo_ContainerInfo, bc *rpc.AgentInfo_ContainerInfo) bool {
+		if ac == nil || bc == nil {
+			return ac == bc
 		}
-	}
-	return true
+		return ac.MountPoint == bc.MountPoint && maps.Equal(ac.Environment, bc.Environment)
+	})
 }
 
-// WatchAgentsNS notifies a client of the set of known Agents.
-func (s *service) WatchAgentsNS(request *rpc.AgentsRequest, stream rpc.Manager_WatchAgentsNSServer) error {
-	ctx := managerutil.WithSessionInfo(stream.Context(), request.Session)
-
-	dlog.Debug(ctx, "WatchAgentsNS called")
-
-	snapshotCh := s.state.WatchAgents(ctx, nil)
-	sessionDone, err := s.state.SessionDone(request.Session.GetSessionId())
+func (s *service) watchAgents(ctx context.Context, includeAgent func(string, *rpc.AgentInfo) bool, stream rpc.Manager_WatchAgentsServer) error {
+	snapshotCh := s.state.WatchAgents(ctx, includeAgent)
+	sessionDone, err := s.state.SessionDone(managerutil.GetSessionID(ctx))
 	if err != nil {
 		return err
 	}
 
-	// Ensure that initial snapshot is not equal to lastSnap even if it is empty so
-	// that an initial snapshot is sent even when it's empty.
-	lastSnap := make(map[string]*rpc.AgentInfo)
-	lastSnap[""] = nil
-	snapEqual := func(snap []*rpc.AgentInfo) bool {
-		if len(snap) != len(lastSnap) {
-			return false
-		}
-		for _, a := range snap {
-			if b, ok := lastSnap[a.PodIp]; !ok || !infosEqual(a, b) {
-				return false
-			}
-		}
-		return true
-	}
-
-	includeAgent := func(a *rpc.AgentInfo) bool {
-		for _, ns := range request.Namespaces {
-			if ns == a.Namespace {
-				return true
-			}
-		}
-		return false
-	}
+	// Ensure that the initial snapshot is not equal to lastSnap even if it is empty by
+	// creating a lastSnap with one nil entry.
+	lastSnap := make([]*rpc.AgentInfo, 1)
 
 	for {
 		select {
@@ -444,26 +427,25 @@ func (s *service) WatchAgentsNS(request *rpc.AgentsRequest, stream rpc.Manager_W
 				dlog.Debug(ctx, "WatchAgentsNS request cancelled")
 				return nil
 			}
-			var agents []*rpc.AgentInfo
-			for _, agent := range snapshot.State {
-				if includeAgent(agent) {
-					agents = append(agents, agent)
-				}
+			agentSessionIDs := maps.Keys(snapshot.State)
+			sort.Strings(agentSessionIDs)
+			agents := make([]*rpc.AgentInfo, len(agentSessionIDs))
+			for i, agentSessionID := range agentSessionIDs {
+				agents[i] = snapshot.State[agentSessionID]
 			}
-			if snapEqual(agents) {
+			if slices.EqualFunc(agents, lastSnap, infosEqual) {
 				continue
 			}
-			lastSnap = make(map[string]*rpc.AgentInfo, len(agents))
-			for _, a := range agents {
-				lastSnap[a.PodIp] = a
+			lastSnap = agents
+			if dlog.MaxLogLevel(ctx) >= dlog.LogLevelDebug {
+				names := make([]string, len(agents))
+				i := 0
+				for _, a := range agents {
+					names[i] = a.Name + "." + a.Namespace
+					i++
+				}
+				dlog.Debugf(ctx, "WatchAgentsNS sending update %v", names)
 			}
-			names := make([]string, len(agents))
-			i := 0
-			for _, a := range agents {
-				names[i] = a.Name + "." + a.Namespace
-				i++
-			}
-			dlog.Debugf(ctx, "WatchAgentsNS sending update %v", names)
 			resp := &rpc.AgentInfoSnapshot{
 				Agents: agents,
 			}
@@ -588,33 +570,36 @@ func (s *service) GetKnownWorkloadKinds(ctx context.Context, request *rpc.Sessio
 	kinds := make([]rpc.WorkloadInfo_Kind, len(enabledWorkloadKinds))
 	for i, wlKind := range enabledWorkloadKinds {
 		switch wlKind {
-		case workload.DeploymentWorkloadKind:
+		case workload.DeploymentKind:
 			kinds[i] = rpc.WorkloadInfo_DEPLOYMENT
-		case workload.ReplicaSetWorkloadKind:
+		case workload.ReplicaSetKind:
 			kinds[i] = rpc.WorkloadInfo_REPLICASET
-		case workload.StatefulSetWorkloadKind:
+		case workload.StatefulSetKind:
 			kinds[i] = rpc.WorkloadInfo_STATEFULSET
-		case workload.RolloutWorkloadKind:
+		case workload.RolloutKind:
 			kinds[i] = rpc.WorkloadInfo_ROLLOUT
 		}
 	}
 	return &rpc.KnownWorkloadKinds{Kinds: kinds}, nil
 }
 
-func (s *service) EnsureAgent(ctx context.Context, request *rpc.EnsureAgentRequest) (*empty.Empty, error) {
+func (s *service) EnsureAgent(ctx context.Context, request *rpc.EnsureAgentRequest) (*rpc.AgentInfoSnapshot, error) {
 	session := request.GetSession()
 	ctx = managerutil.WithSessionInfo(ctx, session)
 	dlog.Debugf(ctx, "EnsureAgent called")
 	sessionID := session.GetSessionId()
 	client := s.state.GetClient(sessionID)
 	if client == nil {
-		return &empty.Empty{}, status.Errorf(codes.NotFound, "Client session %q not found", sessionID)
+		return nil, status.Errorf(codes.NotFound, "Client session %q not found", sessionID)
 	}
-	err := s.state.EnsureAgent(ctx, request.Name, client.Namespace)
+	as, err := s.state.EnsureAgent(ctx, request.Name, client.Namespace)
 	if err != nil {
-		err = status.Errorf(codes.Internal, "failed to ensure agent for workload %s: %v", request.Name, err)
+		return nil, status.Convert(err).Err()
 	}
-	return &empty.Empty{}, err
+	if len(as) == 0 {
+		return nil, status.Errorf(codes.Internal, "failed to ensure agent for workload %s: no agents became active", request.Name)
+	}
+	return &rpc.AgentInfoSnapshot{Agents: as}, nil
 }
 
 // CreateIntercept lets a client create an intercept.
@@ -763,18 +748,24 @@ func (s *service) ReviewIntercept(ctx context.Context, rIReq *rpc.ReviewIntercep
 	return &empty.Empty{}, nil
 }
 
-func (s *service) removeExcludedEnvVars(ctx context.Context, envVars map[string]string) map[string]string {
+func getExcludedEnvVars(ctx context.Context) []string {
 	cm, err := k8sapi.GetK8sInterface(ctx).CoreV1().ConfigMaps(managerutil.GetEnv(ctx).ManagerNamespace).Get(ctx, "telepresence-intercept-env", v1.GetOptions{})
 	if err != nil {
 		dlog.Errorf(ctx, "cannot read excluded variables configmap: %v", err)
-		return envVars
+		return nil
 	}
+	keysList := strings.TrimSpace(cm.Data["excluded"])
+	if keysList == "" {
+		return nil
+	}
+	return strings.Split(keysList, "\n")
+}
 
-	keys := strings.Split(cm.Data["excluded"], "\n")
+func (s *service) removeExcludedEnvVars(ctx context.Context, envVars map[string]string) map[string]string {
+	keys := getExcludedEnvVars(ctx)
 	for _, key := range keys {
 		delete(envVars, key)
 	}
-
 	return envVars
 }
 
@@ -991,6 +982,8 @@ func (s *service) WatchWorkloads(request *rpc.WorkloadEventsRequest, stream rpc.
 			return status.Errorf(codes.NotFound, "Client session %q not found", clientSession)
 		}
 		namespace = clientInfo.Namespace
+	} else if !s.State().ManagesNamespace(ctx, namespace) {
+		return status.Error(codes.FailedPrecondition, fmt.Sprintf("namespace %s is not managed", namespace))
 	}
 	ww := s.state.NewWorkloadInfoWatcher(clientSession, namespace)
 	return ww.Watch(ctx, stream)

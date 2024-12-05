@@ -51,6 +51,33 @@ items:
           `--replace` option is used, it ensures that this container is replaced.
         docs: https://telepresence.io/docs/reference/intercepts/container
       - type: feature
+        title: New telepresence ingest command
+        body: >-
+          The new `telepresence ingest` command, similar to `telepresence intercept`, provides local access to the
+          volume mounts and environment variables of a targeted container. However, unlike `telepresence intercept`,
+          `telepresence ingest` does not redirect traffic to the container and ensures that the mounted volumes are
+          read-only.
+          
+          An ingest requires a traffic-agent to be installed in the pods of the targeted workload. Beyond that, it's
+          a client-side operation. This allows developers to have multiple simultaneous ingests on the same container.
+      - type: feature
+        title: New telepresence curl command
+        body: >-
+          The new `telepresence curl` command runs curl from within a container. The command requires that a connection
+          has been established using `telepresence connect --docker`, and the container that runs `curl` will share the
+          same network as the containerized telepresence daemon.
+      - type: feature
+        title: New telepresence docker-run command
+        body: >-
+          The new `telepresence docker-run <flags and arguments>` requires that a connection has been established using
+          `telepresence connect --docker` It will perform a `docker run <flags and arguments>` and add the flag necessary
+          to ensure that started container shares the same network as the containerized telepresence daemon.
+      - type: feature
+        title: Mount everything read-only during intercept
+        body: >-
+          It is now possible to append ":ro" to the intercept `--mount` flag value. This ensures that all remote volumes
+          that the intercept mounts are read-only.
+      - type: feature
         title: Unify client configuration
         body: >-
           Previously, client configuration was divided between the config.yml file and a Kubernetes extension. DNS and
@@ -81,15 +108,58 @@ items:
       - type: feature
         title: Add deployments, statefulSets, replicaSets to workloads Helm chart value
         body: >-
-          The Helm chart value <code>workloads</code> now supports the kinds <code>deployments.enabled</code>, <code>statefulSets.enabled</code>, and <code>replicaSets.enabled</code>.
-          By default, all three are enabled, but can be disabled by setting the corresponding value to <code>false</code>.
-          When disabled, the traffic-manager will ignore workloads of a corresponding kind, and Telepresence will not be able to intercept them.
+          The Helm chart value `workloads` now supports the kinds `deployments.enabled`, `statefulSets.enabled`, `replicaSets.enabled`.
+          and `rollouts.enabled`. All except `rollouts` are enabled by default. The traffic-manager will ignore workloads, and
+          Telepresence will not be able to intercept them, if the `enabled` of the corresponding kind is set to `false`.
+      - type: feature
+        title: Improved command auto-completion
+        body: >-
+          The auto-completion of namespaces, services, and containers have been added where appropriate, and the default
+          file auto completion has been removed from most commands.
+      - feature:
+        title: Docker run flags --publish, --expose, and --network now work with docker mode connections
+        body: >-
+          After establishing a connection to a cluster using `telepresence connect --docker`, you can run new containers that share
+          the same network as the containerized daemon that maintains the connection. This enables seamless communication between
+          your local development environment and the remote services.
+          
+          Normally, Docker has a limitation that prevents combining a shared network configuration with custom networks
+          and exposing ports. However, Telepresence now elegantly circumvents this limitation so that a container started with
+          `telepresence docker-run`, `telepresence intercept --docker-run`, or `telepresence ingest --docker-run` can use flags
+          like `--network`, `--publish`, or `--expose`.
+
+          To achieve this, Telepresence temporarily adds the necessary network to the containerized daemon. This allows the new
+          container to join the same network. Additionally, Telepresence starts extra socat containers to handle port mapping,
+          ensuring that the desired ports are exposed to the local environment.
       - type: feature
         title: Allow Helm chart to be included as a sub-chart
         body: >-
           The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally
           called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart
           called anything but "traffic-manager".  This restriction has been lifted.
+      - type: change
+        title: During an intercept, the local port defaults to the targeted port of the intercepted container instead of 8080.
+        body: >-
+          Telepresence mimics the environment of a target container during an intercept, so it's only natural that the default
+          for the local port is determined by the targeted container port rather than just defaulting to 8080.
+          
+          A default can still be explicitly defined using the `config.intercept.defaultPort` setting.
+      - type: bugfix
+        title: Prevent that traffic-manager injects a traffic-agent into itself.
+        body: >-
+          The traffic-manager can never be a subject for an intercept, ingest, or proxy-via, because that means that
+          it injects the traffic-agent into itself, and it is not designed to do that. A user attempting this will
+          now see a meaningful error message.
+      - type: bugfix
+        title: Don't include pods in the kube-system namespace when computing pod-subnets from pod IPs
+        body: >-
+          A user would normally never access pods in the `kube-system` namespace directly, and automatically including pods
+          included there when computing the subnets will often lead to problems when running the cluster locally. This namespace
+          is therefore now excluded in situations when the pod subnets are computed from the IPs of pods. Services in this
+          namespace will still be available through the service subnet.
+          
+          If a user should require the pod-subnet to be mapped, it can be added to the `client.routing.alsoProxy`
+          list in the helm chart.
   - version: 2.20.3
     date: 2024-11-18
     notes:
@@ -881,7 +951,7 @@ items:
         body: >-
           Fixes a regression introduced in version 2.10.5, making it impossible to set the traffic-manager namespace
           using the telepresence.io kubeconfig extension.
-        docs: https://www.getambassador.io/docs/telepresence/latest/reference/config#manager
+        docs: https://www.telepresence.io/docs/reference/config#manager
   - version: 2.14.0
     date: "2023-06-12"
     notes:

@@ -13,9 +13,10 @@ func testVPN() *cobra.Command {
 		Short: "Test VPN configuration for compatibility with telepresence",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return errcat.User.New("the test-vpn command is deprecated." +
-				" Please see https://www.getambassador.io/docs/telepresence/latest/reference/vpn" +
+				" Please see https://www.telepresence.io/docs/reference/vpn" +
 				" to learn how to configure telepresence for your VPN.")
 		},
+		ValidArgsFunction: cobra.NoFileCompletions,
 	}
 	return cmd
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/telepresenceio/telepresence/v2/cmd/traffic/cmd/manager/watchable"
 	"github.com/telepresenceio/telepresence/v2/pkg/agentconfig"
 	"github.com/telepresenceio/telepresence/v2/pkg/dnsproxy"
+	"github.com/telepresenceio/telepresence/v2/pkg/informer"
 	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
 	"github.com/telepresenceio/telepresence/v2/pkg/log"
 	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
@@ -51,6 +52,7 @@ type State interface {
 	CountTunnelEgress() uint64
 	ExpireSessions(context.Context, time.Time, time.Time)
 	GetAgent(sessionID string) *rpc.AgentInfo
+	GetOrGenerateAgentConfig(ctx context.Context, name, namespace string) (agentconfig.SidecarExt, error)
 	GetActiveAgent(sessionID string) *rpc.AgentInfo
 	GetAllClients() map[string]*rpc.ClientInfo
 	GetClient(sessionID string) *rpc.ClientInfo
@@ -66,7 +68,7 @@ type State interface {
 	MarkSession(*rpc.RemainRequest, time.Time) bool
 	NewInterceptInfo(string, *rpc.SessionInfo, *rpc.CreateInterceptRequest) *rpc.InterceptInfo
 	PostLookupDNSResponse(context.Context, *rpc.DNSAgentResponse)
-	EnsureAgent(context.Context, string, string) error
+	EnsureAgent(context.Context, string, string) ([]*rpc.AgentInfo, error)
 	PrepareIntercept(context.Context, *rpc.CreateInterceptRequest) (*rpc.PreparedIntercept, error)
 	RemoveIntercept(context.Context, string)
 	DropIntercept(string)
@@ -91,10 +93,11 @@ type State interface {
 	WatchAgents(context.Context, func(sessionID string, agent *rpc.AgentInfo) bool) <-chan watchable.Snapshot[*rpc.AgentInfo]
 	WatchDial(sessionID string) <-chan *rpc.DialRequest
 	WatchIntercepts(context.Context, func(sessionID string, intercept *rpc.InterceptInfo) bool) <-chan watchable.Snapshot[*rpc.InterceptInfo]
-	WatchWorkloads(ctx context.Context, sessionID string) (ch <-chan []workload.WorkloadEvent, err error)
+	WatchWorkloads(ctx context.Context, sessionID string) (ch <-chan []workload.Event, err error)
 	WatchLookupDNS(string) <-chan *rpc.DNSRequest
 	ValidateCreateAgent(context.Context, k8sapi.Workload, agentconfig.SidecarExt) error
 	NewWorkloadInfoWatcher(clientSession, namespace string) WorkloadInfoWatcher
+	ManagesNamespace(context.Context, string) bool
 }
 
 type (
@@ -147,6 +150,10 @@ type state struct {
 
 	// Possibly extended version of the state. Use when calling interface methods.
 	self State
+}
+
+func (s *state) ManagesNamespace(ctx context.Context, ns string) bool {
+	return informer.GetK8sFactory(ctx, ns) != nil
 }
 
 var NewStateFunc = NewState //nolint:gochecknoglobals // extension point
@@ -488,7 +495,7 @@ func (s *state) WatchAgents(
 	}
 }
 
-func (s *state) WatchWorkloads(ctx context.Context, sessionID string) (ch <-chan []workload.WorkloadEvent, err error) {
+func (s *state) WatchWorkloads(ctx context.Context, sessionID string) (ch <-chan []workload.Event, err error) {
 	client := s.GetClient(sessionID)
 	if client == nil {
 		return nil, status.Errorf(codes.NotFound, "session %q not found", sessionID)

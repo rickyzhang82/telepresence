@@ -50,20 +50,17 @@ func (s *helmSuite) Test_HelmCanInterceptInManagedNamespace() {
 	s.Contains(stdout, s.ServiceName()+": intercepted")
 }
 
-func (s *helmSuite) Test_HelmCannotInterceptInUnmanagedNamespace() {
+func (s *helmSuite) Test_HelmCannotConnectToUnmanagedNamespace() {
 	ctx := s.Context()
-	itest.TelepresenceDisconnectOk(ctx)
-	itest.TelepresenceOk(ctx, "connect", "--namespace", s.appSpace2, "--manager-namespace", s.ManagerNamespace())
 	defer func() {
-		itest.TelepresenceDisconnectOk(ctx)
+		ctx := s.Context()
+		_, _, _ = itest.Telepresence(ctx, "disconnect") //nolint:dogsled // X
 		s.TelepresenceConnect(ctx)
 	}()
-	_, stderr, err := itest.Telepresence(itest.WithUser(ctx, "default"), "intercept", "--mount", "false", s.ServiceName(), "--port", "9090")
+	itest.TelepresenceDisconnectOk(ctx)
+	_, stderr, err := itest.Telepresence(ctx, "connect", "--namespace", s.appSpace2, "--manager-namespace", s.ManagerNamespace())
 	s.Error(err)
-	s.True(
-		strings.Contains(stderr, `No interceptable deployment, replicaset, or statefulset matching echo found`) ||
-			strings.Contains(stderr, `cannot get resource "deployments" in API group "apps" in the namespace`),
-		"stderr = %s", stderr)
+	s.True(strings.Contains(stderr, fmt.Sprintf(`namespace %s is not managed`, s.appSpace2)))
 }
 
 func (s *helmSuite) Test_HelmWebhookInjectsInManagedNamespace() {

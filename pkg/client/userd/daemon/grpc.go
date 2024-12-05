@@ -323,7 +323,7 @@ func (s *service) UpdateIntercept(c context.Context, rr *manager.UpdateIntercept
 
 func (s *service) AddInterceptor(ctx context.Context, interceptor *rpc.Interceptor) (*empty.Empty, error) {
 	return &empty.Empty{}, s.WithSession(ctx, "AddInterceptor", func(_ context.Context, session userd.Session) error {
-		return session.AddInterceptor(interceptor.InterceptId, interceptor)
+		return session.AddInterceptor(ctx, interceptor.InterceptId, interceptor)
 	})
 }
 
@@ -552,6 +552,15 @@ func (s *service) AgentImageFQN(ctx context.Context, empty *emptypb.Empty) (fqn 
 	return fqn, err
 }
 
+func (s *service) GetAgentConfig(ctx context.Context, request *manager.AgentConfigRequest) (rsp *manager.AgentConfigResponse, err error) {
+	err = s.WithSession(ctx, "AgentConfig", func(ctx context.Context, session userd.Session) error {
+		request.Session = session.SessionInfo()
+		rsp, err = session.ManagerClient().GetAgentConfig(ctx, request)
+		return err
+	})
+	return rsp, err
+}
+
 func (s *service) GetClusterSubnets(ctx context.Context, _ *empty.Empty) (cs *rpc.ClusterSubnets, err error) {
 	podSubnets := []*manager.IPNet{}
 	svcSubnets := []*manager.IPNet{}
@@ -609,6 +618,30 @@ func (s *service) SetDNSMappings(ctx context.Context, req *daemon.SetDNSMappings
 		return err
 	})
 	return &empty.Empty{}, err
+}
+
+func (s *service) Ingest(ctx context.Context, request *rpc.IngestRequest) (response *rpc.IngestInfo, err error) {
+	err = s.WithSession(ctx, "Ingest", func(ctx context.Context, session userd.Session) error {
+		response, err = session.Ingest(ctx, request)
+		return err
+	})
+	return response, err
+}
+
+func (s *service) GetIngest(ctx context.Context, request *rpc.IngestIdentifier) (response *rpc.IngestInfo, err error) {
+	err = s.WithSession(ctx, "GetIngest", func(ctx context.Context, session userd.Session) error {
+		response, err = session.GetIngest(request)
+		return err
+	})
+	return response, err
+}
+
+func (s *service) LeaveIngest(ctx context.Context, request *rpc.IngestIdentifier) (response *rpc.IngestInfo, err error) {
+	err = s.WithSession(ctx, "LeaveIngest", func(ctx context.Context, session userd.Session) error {
+		response, err = session.LeaveIngest(ctx, request)
+		return err
+	})
+	return response, err
 }
 
 func (s *service) withRootDaemon(ctx context.Context, f func(ctx context.Context, daemonClient daemon.DaemonClient) error) error {

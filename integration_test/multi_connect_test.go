@@ -22,7 +22,7 @@ import (
 
 type multiConnectSuite struct {
 	itest.Suite
-	itest.NamespacePair
+	itest.TrafficManager
 	appSpace2  string
 	mgrSpace2  string
 	handlerTag string
@@ -34,8 +34,8 @@ func (s *multiConnectSuite) SuiteName() string {
 
 func init() {
 	// This will give us one namespace pair with a traffic-manager installed.
-	itest.AddTrafficManagerSuite("-1", func(h itest.NamespacePair) itest.TestingSuite {
-		return &multiConnectSuite{Suite: itest.Suite{Harness: h}, NamespacePair: h}
+	itest.AddTrafficManagerSuite("-1", func(h itest.TrafficManager) itest.TestingSuite {
+		return &multiConnectSuite{Suite: itest.Suite{Harness: h}, TrafficManager: h}
 	})
 }
 
@@ -195,16 +195,15 @@ func (s *multiConnectSuite) doubleConnectCheck(ctx1, ctx2 context.Context, n1, n
 		s.Eventually(
 			// condition
 			func() bool {
-				out, err := itest.Output(ctx,
-					"docker", "run", "--network", "container:"+"tp-"+cn, "--rm", "curlimages/curl", "--silent", "--max-time", "2", svc)
+				ot, et, err := itest.Telepresence(ctx, "--use", cn, "curl", "--silent", "--max-time", "2", svc)
 				if err != nil {
-					dlog.Errorf(ctx, "%s:%v", out, err)
+					dlog.Errorf(ctx, "%s%s:%v", ot, et, err)
 					return false
 				}
-				dlog.Info(ctx, out)
-				return expectedOutput.MatchString(out)
+				dlog.Info(ctx, ot)
+				return expectedOutput.MatchString(ot)
 			},
-			10*time.Second, // waitFor
+			20*time.Second, // waitFor
 			3*time.Second,  // polling interval
 			`body of %q matches %q`, "http://"+svc, expectedOutput,
 		)

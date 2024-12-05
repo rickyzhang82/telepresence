@@ -33,6 +33,9 @@ const (
 	Connector_GetClusterSubnets_FullMethodName       = "/telepresence.connector.Connector/GetClusterSubnets"
 	Connector_Status_FullMethodName                  = "/telepresence.connector.Connector/Status"
 	Connector_CanIntercept_FullMethodName            = "/telepresence.connector.Connector/CanIntercept"
+	Connector_Ingest_FullMethodName                  = "/telepresence.connector.Connector/Ingest"
+	Connector_GetIngest_FullMethodName               = "/telepresence.connector.Connector/GetIngest"
+	Connector_LeaveIngest_FullMethodName             = "/telepresence.connector.Connector/LeaveIngest"
 	Connector_CreateIntercept_FullMethodName         = "/telepresence.connector.Connector/CreateIntercept"
 	Connector_RemoveIntercept_FullMethodName         = "/telepresence.connector.Connector/RemoveIntercept"
 	Connector_UpdateIntercept_FullMethodName         = "/telepresence.connector.Connector/UpdateIntercept"
@@ -51,6 +54,7 @@ const (
 	Connector_GetConfig_FullMethodName               = "/telepresence.connector.Connector/GetConfig"
 	Connector_SetDNSExcludes_FullMethodName          = "/telepresence.connector.Connector/SetDNSExcludes"
 	Connector_SetDNSMappings_FullMethodName          = "/telepresence.connector.Connector/SetDNSMappings"
+	Connector_GetAgentConfig_FullMethodName          = "/telepresence.connector.Connector/GetAgentConfig"
 )
 
 // ConnectorClient is the client API for Connector service.
@@ -86,6 +90,12 @@ type ConnectorClient interface {
 	Status(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ConnectInfo, error)
 	// Queries the connector whether it is possible to create the given intercept.
 	CanIntercept(ctx context.Context, in *CreateInterceptRequest, opts ...grpc.CallOption) (*InterceptResult, error)
+	// Starts an Ingest session.
+	Ingest(ctx context.Context, in *IngestRequest, opts ...grpc.CallOption) (*IngestInfo, error)
+	// Get info about an ongoing Ingest.
+	GetIngest(ctx context.Context, in *IngestIdentifier, opts ...grpc.CallOption) (*IngestInfo, error)
+	// Ends an Ingest session.
+	LeaveIngest(ctx context.Context, in *IngestIdentifier, opts ...grpc.CallOption) (*IngestInfo, error)
 	// Adds an intercept to a workload.  Requires having already called
 	// Connect.
 	CreateIntercept(ctx context.Context, in *CreateInterceptRequest, opts ...grpc.CallOption) (*InterceptResult, error)
@@ -129,6 +139,8 @@ type ConnectorClient interface {
 	SetDNSExcludes(ctx context.Context, in *daemon.SetDNSExcludesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// SetDNSMappings sets the Mappings field of DNSConfig.
 	SetDNSMappings(ctx context.Context, in *daemon.SetDNSMappingsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetAgentConfig returns the agent configuration for a specific workload.
+	GetAgentConfig(ctx context.Context, in *manager.AgentConfigRequest, opts ...grpc.CallOption) (*manager.AgentConfigResponse, error)
 }
 
 type connectorClient struct {
@@ -233,6 +245,36 @@ func (c *connectorClient) CanIntercept(ctx context.Context, in *CreateInterceptR
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InterceptResult)
 	err := c.cc.Invoke(ctx, Connector_CanIntercept_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *connectorClient) Ingest(ctx context.Context, in *IngestRequest, opts ...grpc.CallOption) (*IngestInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IngestInfo)
+	err := c.cc.Invoke(ctx, Connector_Ingest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *connectorClient) GetIngest(ctx context.Context, in *IngestIdentifier, opts ...grpc.CallOption) (*IngestInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IngestInfo)
+	err := c.cc.Invoke(ctx, Connector_GetIngest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *connectorClient) LeaveIngest(ctx context.Context, in *IngestIdentifier, opts ...grpc.CallOption) (*IngestInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IngestInfo)
+	err := c.cc.Invoke(ctx, Connector_LeaveIngest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -442,6 +484,16 @@ func (c *connectorClient) SetDNSMappings(ctx context.Context, in *daemon.SetDNSM
 	return out, nil
 }
 
+func (c *connectorClient) GetAgentConfig(ctx context.Context, in *manager.AgentConfigRequest, opts ...grpc.CallOption) (*manager.AgentConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(manager.AgentConfigResponse)
+	err := c.cc.Invoke(ctx, Connector_GetAgentConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConnectorServer is the server API for Connector service.
 // All implementations must embed UnimplementedConnectorServer
 // for forward compatibility
@@ -475,6 +527,12 @@ type ConnectorServer interface {
 	Status(context.Context, *emptypb.Empty) (*ConnectInfo, error)
 	// Queries the connector whether it is possible to create the given intercept.
 	CanIntercept(context.Context, *CreateInterceptRequest) (*InterceptResult, error)
+	// Starts an Ingest session.
+	Ingest(context.Context, *IngestRequest) (*IngestInfo, error)
+	// Get info about an ongoing Ingest.
+	GetIngest(context.Context, *IngestIdentifier) (*IngestInfo, error)
+	// Ends an Ingest session.
+	LeaveIngest(context.Context, *IngestIdentifier) (*IngestInfo, error)
 	// Adds an intercept to a workload.  Requires having already called
 	// Connect.
 	CreateIntercept(context.Context, *CreateInterceptRequest) (*InterceptResult, error)
@@ -518,6 +576,8 @@ type ConnectorServer interface {
 	SetDNSExcludes(context.Context, *daemon.SetDNSExcludesRequest) (*emptypb.Empty, error)
 	// SetDNSMappings sets the Mappings field of DNSConfig.
 	SetDNSMappings(context.Context, *daemon.SetDNSMappingsRequest) (*emptypb.Empty, error)
+	// GetAgentConfig returns the agent configuration for a specific workload.
+	GetAgentConfig(context.Context, *manager.AgentConfigRequest) (*manager.AgentConfigResponse, error)
 	mustEmbedUnimplementedConnectorServer()
 }
 
@@ -554,6 +614,15 @@ func (UnimplementedConnectorServer) Status(context.Context, *emptypb.Empty) (*Co
 }
 func (UnimplementedConnectorServer) CanIntercept(context.Context, *CreateInterceptRequest) (*InterceptResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CanIntercept not implemented")
+}
+func (UnimplementedConnectorServer) Ingest(context.Context, *IngestRequest) (*IngestInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ingest not implemented")
+}
+func (UnimplementedConnectorServer) GetIngest(context.Context, *IngestIdentifier) (*IngestInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetIngest not implemented")
+}
+func (UnimplementedConnectorServer) LeaveIngest(context.Context, *IngestIdentifier) (*IngestInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LeaveIngest not implemented")
 }
 func (UnimplementedConnectorServer) CreateIntercept(context.Context, *CreateInterceptRequest) (*InterceptResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateIntercept not implemented")
@@ -608,6 +677,9 @@ func (UnimplementedConnectorServer) SetDNSExcludes(context.Context, *daemon.SetD
 }
 func (UnimplementedConnectorServer) SetDNSMappings(context.Context, *daemon.SetDNSMappingsRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetDNSMappings not implemented")
+}
+func (UnimplementedConnectorServer) GetAgentConfig(context.Context, *manager.AgentConfigRequest) (*manager.AgentConfigResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAgentConfig not implemented")
 }
 func (UnimplementedConnectorServer) mustEmbedUnimplementedConnectorServer() {}
 
@@ -798,6 +870,60 @@ func _Connector_CanIntercept_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ConnectorServer).CanIntercept(ctx, req.(*CreateInterceptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Connector_Ingest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IngestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectorServer).Ingest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Connector_Ingest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectorServer).Ingest(ctx, req.(*IngestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Connector_GetIngest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IngestIdentifier)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectorServer).GetIngest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Connector_GetIngest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectorServer).GetIngest(ctx, req.(*IngestIdentifier))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Connector_LeaveIngest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IngestIdentifier)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectorServer).LeaveIngest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Connector_LeaveIngest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectorServer).LeaveIngest(ctx, req.(*IngestIdentifier))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1129,6 +1255,24 @@ func _Connector_SetDNSMappings_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Connector_GetAgentConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(manager.AgentConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectorServer).GetAgentConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Connector_GetAgentConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectorServer).GetAgentConfig(ctx, req.(*manager.AgentConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Connector_ServiceDesc is the grpc.ServiceDesc for Connector service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1175,6 +1319,18 @@ var Connector_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CanIntercept",
 			Handler:    _Connector_CanIntercept_Handler,
+		},
+		{
+			MethodName: "Ingest",
+			Handler:    _Connector_Ingest_Handler,
+		},
+		{
+			MethodName: "GetIngest",
+			Handler:    _Connector_GetIngest_Handler,
+		},
+		{
+			MethodName: "LeaveIngest",
+			Handler:    _Connector_LeaveIngest_Handler,
 		},
 		{
 			MethodName: "CreateIntercept",
@@ -1244,6 +1400,10 @@ var Connector_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "SetDNSMappings",
 			Handler:    _Connector_SetDNSMappings_Handler,
 		},
+		{
+			MethodName: "GetAgentConfig",
+			Handler:    _Connector_GetAgentConfig_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -1278,7 +1438,7 @@ type ManagerProxyClient interface {
 	// GetClientConfig returns the config that connected clients should use for this manager.
 	GetClientConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*manager.CLIConfig, error)
 	// EnsureAgent ensures that an agent is injected to the pods of a workload
-	EnsureAgent(ctx context.Context, in *manager.EnsureAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	EnsureAgent(ctx context.Context, in *manager.EnsureAgentRequest, opts ...grpc.CallOption) (*manager.AgentInfoSnapshot, error)
 	// WatchClusterInfo returns information needed when establishing
 	// connectivity to the cluster.
 	WatchClusterInfo(ctx context.Context, in *manager.SessionInfo, opts ...grpc.CallOption) (ManagerProxy_WatchClusterInfoClient, error)
@@ -1322,9 +1482,9 @@ func (c *managerProxyClient) GetClientConfig(ctx context.Context, in *emptypb.Em
 	return out, nil
 }
 
-func (c *managerProxyClient) EnsureAgent(ctx context.Context, in *manager.EnsureAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *managerProxyClient) EnsureAgent(ctx context.Context, in *manager.EnsureAgentRequest, opts ...grpc.CallOption) (*manager.AgentInfoSnapshot, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(manager.AgentInfoSnapshot)
 	err := c.cc.Invoke(ctx, ManagerProxy_EnsureAgent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -1421,7 +1581,7 @@ type ManagerProxyServer interface {
 	// GetClientConfig returns the config that connected clients should use for this manager.
 	GetClientConfig(context.Context, *emptypb.Empty) (*manager.CLIConfig, error)
 	// EnsureAgent ensures that an agent is injected to the pods of a workload
-	EnsureAgent(context.Context, *manager.EnsureAgentRequest) (*emptypb.Empty, error)
+	EnsureAgent(context.Context, *manager.EnsureAgentRequest) (*manager.AgentInfoSnapshot, error)
 	// WatchClusterInfo returns information needed when establishing
 	// connectivity to the cluster.
 	WatchClusterInfo(*manager.SessionInfo, ManagerProxy_WatchClusterInfoServer) error
@@ -1448,7 +1608,7 @@ func (UnimplementedManagerProxyServer) Version(context.Context, *emptypb.Empty) 
 func (UnimplementedManagerProxyServer) GetClientConfig(context.Context, *emptypb.Empty) (*manager.CLIConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClientConfig not implemented")
 }
-func (UnimplementedManagerProxyServer) EnsureAgent(context.Context, *manager.EnsureAgentRequest) (*emptypb.Empty, error) {
+func (UnimplementedManagerProxyServer) EnsureAgent(context.Context, *manager.EnsureAgentRequest) (*manager.AgentInfoSnapshot, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EnsureAgent not implemented")
 }
 func (UnimplementedManagerProxyServer) WatchClusterInfo(*manager.SessionInfo, ManagerProxy_WatchClusterInfoServer) error {

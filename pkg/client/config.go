@@ -29,7 +29,6 @@ import (
 	"github.com/telepresenceio/telepresence/rpc/v2/daemon"
 	"github.com/telepresenceio/telepresence/v2/pkg/errcat"
 	"github.com/telepresenceio/telepresence/v2/pkg/filelocation"
-	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
 )
 
 type DefaultsAware interface {
@@ -125,6 +124,10 @@ type BaseConfig struct {
 	ClusterV         Cluster         `json:"cluster,omitzero"`
 	DNSV             DNS             `json:"dns,omitzero"`
 	RoutingV         Routing         `json:"routing,omitzero"`
+
+	// This is actually a traffic-manager setting, and controls
+	// the agent's connection to the client.
+	DummyConnectionTTL time.Duration `json:"connectionTTL,omitzero"`
 }
 
 func (c *BaseConfig) OSSpecific() *OSSpecificConfig {
@@ -339,6 +342,8 @@ type Timeouts struct {
 	PrivateFtpReadWrite time.Duration `json:"ftpReadWrite"`
 	// PrivateFtpShutdown max time to wait for the fuseftp client to complete pending operations before forcing termination.
 	PrivateFtpShutdown time.Duration `json:"ftpShutdown"`
+	// PrivateContainerShutdown max time to wait for a docker container to stop before forcing termination.
+	PrivateContainerShutdown time.Duration `json:"containerShutdown"`
 }
 
 type TimeoutID int
@@ -355,6 +360,7 @@ const (
 	TimeoutTrafficManagerConnect
 	TimeoutFtpReadWrite
 	TimeoutFtpShutdown
+	TimeoutContainerShutdown
 )
 
 type timeoutContext struct {
@@ -401,6 +407,8 @@ func (t *Timeouts) Get(timeoutID TimeoutID) time.Duration {
 		timeoutVal = t.PrivateFtpReadWrite
 	case TimeoutFtpShutdown:
 		timeoutVal = t.PrivateFtpShutdown
+	case TimeoutContainerShutdown:
+		timeoutVal = t.PrivateContainerShutdown
 	default:
 		panic("should not happen")
 	}
@@ -461,6 +469,9 @@ func (e timeoutError) Error() string {
 	case TimeoutFtpShutdown:
 		yamlName = "ftpShutdown"
 		humanName = "FTP client shutdown grace period"
+	case TimeoutContainerShutdown:
+		yamlName = "containerShutdown"
+		humanName = "Docker container shutdown grace period"
 	default:
 		panic("should not happen")
 	}
@@ -491,6 +502,7 @@ const (
 	defaultTimeoutsTrafficManagerConnect = 60 * time.Second
 	defaultTimeoutsFtpReadWrite          = 1 * time.Minute
 	defaultTimeoutsFtpShutdown           = 2 * time.Minute
+	defaultTimeoutsContainerShutdown     = 0
 )
 
 var defaultTimeouts = Timeouts{ //nolint:gochecknoglobals // constant
@@ -505,6 +517,7 @@ var defaultTimeouts = Timeouts{ //nolint:gochecknoglobals // constant
 	PrivateTrafficManagerConnect: defaultTimeoutsTrafficManagerConnect,
 	PrivateFtpReadWrite:          defaultTimeoutsFtpReadWrite,
 	PrivateFtpShutdown:           defaultTimeoutsFtpShutdown,
+	PrivateContainerShutdown:     defaultTimeoutsContainerShutdown,
 }
 
 func (t *Timeouts) defaults() DefaultsAware {
@@ -682,20 +695,38 @@ func (g *TelepresenceAPI) merge(o *TelepresenceAPI) {
 	}
 }
 
-var defaultTelemount = DockerImage{ //nolint:gochecknoglobals // constant
+type Telemount DockerImage
+
+var defaultTelemount = Telemount{ //nolint:gochecknoglobals // constant
 	RegistryAPI: "ghcr.io/v2",
 	Registry:    "ghcr.io",
 	Namespace:   "telepresenceio",
 	Repository:  "telemount",
 }
 
-const (
-	defaultInterceptDefaultPort = 8080
-)
+func (tm *Telemount) defaults() DefaultsAware {
+	return &defaultTelemount
+}
+
+func (tm *Telemount) IsZero() bool {
+	return *tm == defaultTelemount
+}
+
+func (tm *Telemount) MarshalJSONV2(out *jsontext.Encoder, opts json.Options) error {
+	return json.MarshalEncode(out, mapWithoutDefaults(tm), opts)
+}
+
+func (tm *Telemount) UnmarshalJSONV2(in *jsontext.Decoder, opts json.Options) error {
+	// Prevent that the original object is cleared when an empty object is decoded by passing the address
+	// of the pointer to the object. The unmarshal will then instead clear the pointer (wp becomes nil) and
+	// leave the underlying object intact. In other words, this code achieves "omitempty" during unmarshal.
+	type wt Telemount
+	wp := (*wt)(tm)
+	return json.UnmarshalDecode(in, &wp, opts)
+}
 
 var defaultIntercept = Intercept{ //nolint:gochecknoglobals // constant
 	AppProtocolStrategy: k8sapi.Http2Probe,
-	DefaultPort:         defaultInterceptDefaultPort,
 	Telemount:           defaultTelemount,
 }
 
@@ -711,7 +742,7 @@ type Intercept struct {
 	AppProtocolStrategy k8sapi.AppProtocolStrategy `json:"appProtocolStrategy"`
 	DefaultPort         int                        `json:"defaultPort"`
 	UseFtp              bool                       `json:"useFtp"`
-	Telemount           DockerImage                `json:"telemount,omitzero"`
+	Telemount           Telemount                  `json:"telemount,omitzero"`
 }
 
 func (ic *Intercept) defaults() DefaultsAware {
@@ -791,15 +822,24 @@ func (cc *Cluster) UnmarshalJSONV2(in *jsontext.Decoder, opts json.Options) erro
 func (r *Routing) merge(o *Routing) {
 	if len(o.AlsoProxy) > 0 {
 		r.AlsoProxy = o.AlsoProxy
+	} else if len(o.OldAlsoProxy) > 0 {
+		r.AlsoProxy = o.OldAlsoProxy
 	}
 	if len(o.NeverProxy) > 0 {
 		r.NeverProxy = o.NeverProxy
+	} else if len(o.OldNeverProxy) > 0 {
+		r.NeverProxy = o.OldNeverProxy
 	}
 	if len(o.AllowConflicting) > 0 {
 		r.AllowConflicting = o.AllowConflicting
+	} else if len(o.OldAllowConflicting) > 0 {
+		r.AllowConflicting = o.OldAllowConflicting
 	}
 	if len(o.Subnets) > 0 {
 		r.Subnets = o.Subnets
+	}
+	if o.RecursionBlockDuration > 0 {
+		r.RecursionBlockDuration = o.RecursionBlockDuration
 	}
 }
 
@@ -964,36 +1004,25 @@ func LoadConfig(c context.Context) (cfg Config, err error) {
 }
 
 type Routing struct {
-	Subnets          []netip.Prefix `json:"subnets,omitempty"`
-	AlsoProxy        []netip.Prefix `json:"alsoProxy,omitempty"`
-	NeverProxy       []netip.Prefix `json:"neverProxy,omitempty"`
-	AllowConflicting []netip.Prefix `json:"allowConflicting,omitempty"`
-}
+	Subnets                []netip.Prefix `json:"subnets,omitempty"`
+	AlsoProxy              []netip.Prefix `json:"alsoProxySubnets,omitempty"`
+	NeverProxy             []netip.Prefix `json:"neverProxySubnets,omitempty"`
+	AllowConflicting       []netip.Prefix `json:"allowConflictingSubnets,omitempty"`
+	RecursionBlockDuration time.Duration  `json:"recursionBlockDuration,omitempty"`
 
-func (r *Routing) ToRPC() *daemon.Routing {
-	return &daemon.Routing{
-		Subnets:                 iputil.PrefixesToRPC(r.Subnets),
-		AlsoProxySubnets:        iputil.PrefixesToRPC(r.AlsoProxy),
-		NeverProxySubnets:       iputil.PrefixesToRPC(r.NeverProxy),
-		AllowConflictingSubnets: iputil.PrefixesToRPC(r.AllowConflicting),
-	}
-}
-
-func RoutingFromRPC(r *daemon.Routing) *Routing {
-	return &Routing{
-		Subnets:          iputil.RPCsToPrefixes(r.Subnets),
-		AlsoProxy:        iputil.RPCsToPrefixes(r.AlsoProxySubnets),
-		NeverProxy:       iputil.RPCsToPrefixes(r.NeverProxySubnets),
-		AllowConflicting: iputil.RPCsToPrefixes(r.AllowConflictingSubnets),
-	}
+	// For backward compatibility.
+	OldAlsoProxy        []netip.Prefix `json:"alsoProxy,omitempty"`
+	OldNeverProxy       []netip.Prefix `json:"neverProxy,omitempty"`
+	OldAllowConflicting []netip.Prefix `json:"allowConflicting,omitempty"`
 }
 
 // RoutingSnake is the same as Routing but with snake_case json/yaml names.
 type RoutingSnake struct {
-	Subnets          []netip.Prefix `json:"subnets"`
-	AlsoProxy        []netip.Prefix `json:"also_proxy_subnets"`
-	NeverProxy       []netip.Prefix `json:"never_proxy_subnets"`
-	AllowConflicting []netip.Prefix `json:"allow_conflicting_subnets"`
+	Subnets                []netip.Prefix `json:"subnets"`
+	AlsoProxy              []netip.Prefix `json:"also_proxy_subnets"`
+	NeverProxy             []netip.Prefix `json:"never_proxy_subnets"`
+	AllowConflicting       []netip.Prefix `json:"allow_conflicting_subnets"`
+	RecursionBlockDuration time.Duration  `json:"recursion_block_duration"`
 }
 
 type DNS struct {
