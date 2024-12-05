@@ -132,6 +132,17 @@ items:
           container to join the same network. Additionally, Telepresence starts extra socat containers to handle port mapping,
           ensuring that the desired ports are exposed to the local environment.
       - type: feature
+        title: Prevent recursion in the Telepresence Virtual Network Interface (VIF)
+        body: >-
+          Network problems may arise when running Kubernetes locally (e.g., Docker Desktop, Kind, Minikube, k3s),
+          because the VIF on the host is also accessible from the cluster's nodes. A request that isn't handled by a
+          cluster resource might be routed back into the VIF and cause a recursion.
+
+          These recursions can now be prevented by setting the client configuration property
+          `routing.recursionBlockDuration` so that new connection attempts are temporarily blocked for a specific
+          IP:PORT pair immediately after an initial attempt, thereby effectively ending the recursion.
+        docs: https://telepresence.io/docs/howtos/cluster-in-vm
+      - type: feature
         title: Allow Helm chart to be included as a sub-chart
         body: >-
           The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally
