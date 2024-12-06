@@ -239,6 +239,14 @@ func ParseConfigYAML(ctx context.Context, path string, data []byte) (Config, err
 			return nil, err
 		}
 	}
+	if cfg.Routing().VirtualSubnet == defaultVirtualSubnet && cfg.Cluster().OldVirtualIPSubnet != "" {
+		dlog.Warningf(ctx, "please use routing.VirtualSubnet instead of deprecated deprecated cluster.VirtualIPSubnet")
+		sn, err := netip.ParsePrefix(cfg.Cluster().OldVirtualIPSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse deprecated cluster.VirtualIPSubnet: %w", err)
+		}
+		cfg.Routing().VirtualSubnet = sn
+	}
 	return cfg, nil
 }
 
@@ -268,9 +276,9 @@ func (c *BaseConfig) String() string {
 	return string(y)
 }
 
-// Watch uses a file system watcher that receives events when the configuration changes
+// WatchConfig uses a file system watcher that receives events when the configuration changes
 // and calls the given function when that happens.
-func Watch(c context.Context, onReload func(context.Context) error) error {
+func WatchConfig(c context.Context, onReload func(context.Context) error) error {
 	configFile := GetConfigFile(c)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -289,7 +297,14 @@ func Watch(c context.Context, onReload func(context.Context) error) error {
 	// The delay timer will initially sleep forever. It's reset to a very short
 	// delay when the file is modified.
 	delay := time.AfterFunc(time.Duration(math.MaxInt64), func() {
-		if err := onReload(c); err != nil {
+		cfg, err := LoadConfig(c)
+		if err != nil {
+			dlog.Error(c, err)
+		} else {
+			ReplaceConfig(c, cfg)
+			err = onReload(c)
+		}
+		if err != nil {
 			dlog.Error(c, err)
 		}
 	})
@@ -778,7 +793,9 @@ type Cluster struct {
 	ConnectFromRootDaemon   bool     `json:"connectFromRootDaemon"`
 	ForceSPDY               bool     `json:"forceSPDY"`
 	AgentPortForward        bool     `json:"agentPortForward"`
-	VirtualIPSubnet         string   `json:"virtualIPSubnet"`
+
+	// deprecated, use Routing.VirtualSubnet
+	OldVirtualIPSubnet string `json:"virtualIPSubnet"`
 }
 
 // This is used by a different config -- the k8s_config, which needs to be able to tell if it's overridden at a cluster or environment variable level.
@@ -789,7 +806,6 @@ var defaultCluster = Cluster{ //nolint:gochecknoglobals // constant
 	DefaultManagerNamespace: defaultDefaultManagerNamespace,
 	ConnectFromRootDaemon:   true,
 	AgentPortForward:        true,
-	VirtualIPSubnet:         defaultVirtualIPSubnet,
 }
 
 func (cc *Cluster) defaults() DefaultsAware {
@@ -819,6 +835,32 @@ func (cc *Cluster) UnmarshalJSONV2(in *jsontext.Decoder, opts json.Options) erro
 	return json.UnmarshalDecode(in, &wp, opts)
 }
 
+type Routing struct {
+	Subnets                []netip.Prefix `json:"subnets,omitempty"`
+	AlsoProxy              []netip.Prefix `json:"alsoProxySubnets,omitempty"`
+	NeverProxy             []netip.Prefix `json:"neverProxySubnets,omitempty"`
+	AllowConflicting       []netip.Prefix `json:"allowConflictingSubnets,omitempty"`
+	RecursionBlockDuration time.Duration  `json:"recursionBlockDuration,omitempty"`
+	VirtualSubnet          netip.Prefix   `json:"virtualSubnet"`
+	AutoResolveConflicts   bool           `json:"autoResolveConflicts"`
+
+	// For backward compatibility.
+	OldAlsoProxy        []netip.Prefix `json:"alsoProxy,omitempty"`
+	OldNeverProxy       []netip.Prefix `json:"neverProxy,omitempty"`
+	OldAllowConflicting []netip.Prefix `json:"allowConflicting,omitempty"`
+}
+
+const defaultAutoResolveConflicts = true
+
+var defaultRouting = Routing{ //nolint:gochecknoglobals // constant
+	VirtualSubnet:        defaultVirtualSubnet,
+	AutoResolveConflicts: defaultAutoResolveConflicts,
+}
+
+func (r *Routing) defaults() DefaultsAware {
+	return &defaultRouting
+}
+
 func (r *Routing) merge(o *Routing) {
 	if len(o.AlsoProxy) > 0 {
 		r.AlsoProxy = o.AlsoProxy
@@ -841,6 +883,30 @@ func (r *Routing) merge(o *Routing) {
 	if o.RecursionBlockDuration > 0 {
 		r.RecursionBlockDuration = o.RecursionBlockDuration
 	}
+	if o.VirtualSubnet != defaultVirtualSubnet {
+		r.VirtualSubnet = o.VirtualSubnet
+	}
+	if o.AutoResolveConflicts != defaultAutoResolveConflicts { //nolint:gosimple // keep for the semantic clarity
+		r.AutoResolveConflicts = o.AutoResolveConflicts
+	}
+}
+
+// IsZero controls whether this element will be included in marshalled output.
+func (r *Routing) IsZero() bool {
+	return r == nil || isDefault(r)
+}
+
+func (r *Routing) MarshalJSONV2(out *jsontext.Encoder, opts json.Options) error {
+	return json.MarshalEncode(out, mapWithoutDefaults(r), opts)
+}
+
+func (r *Routing) UnmarshalJSONV2(in *jsontext.Decoder, opts json.Options) error {
+	// Prevent that the original object is cleared when an empty object is decoded by passing the address
+	// of the pointer to the object. The unmarshal will then instead clear the pointer (wp becomes nil) and
+	// leave the underlying object intact. In other words, this code achieves "omitempty" during unmarshal.
+	type wt Routing
+	wp := (*wt)(r)
+	return json.UnmarshalDecode(in, &wp, opts)
 }
 
 func (d *DNS) Equal(o *DNS) bool {
@@ -947,7 +1013,7 @@ var defaultConfig = BaseConfig{ //nolint:gochecknoglobals // constant
 	InterceptV:       defaultIntercept,
 	ClusterV:         defaultCluster,
 	DNSV:             defaultDNS,
-	RoutingV:         Routing{},
+	RoutingV:         defaultRouting,
 }
 
 // GetDefaultBaseConfig returns the default configuration settings.
@@ -1003,19 +1069,6 @@ func LoadConfig(c context.Context) (cfg Config, err error) {
 	return cfg, nil
 }
 
-type Routing struct {
-	Subnets                []netip.Prefix `json:"subnets,omitempty"`
-	AlsoProxy              []netip.Prefix `json:"alsoProxySubnets,omitempty"`
-	NeverProxy             []netip.Prefix `json:"neverProxySubnets,omitempty"`
-	AllowConflicting       []netip.Prefix `json:"allowConflictingSubnets,omitempty"`
-	RecursionBlockDuration time.Duration  `json:"recursionBlockDuration,omitempty"`
-
-	// For backward compatibility.
-	OldAlsoProxy        []netip.Prefix `json:"alsoProxy,omitempty"`
-	OldNeverProxy       []netip.Prefix `json:"neverProxy,omitempty"`
-	OldAllowConflicting []netip.Prefix `json:"allowConflicting,omitempty"`
-}
-
 // RoutingSnake is the same as Routing but with snake_case json/yaml names.
 type RoutingSnake struct {
 	Subnets                []netip.Prefix `json:"subnets"`
@@ -1023,6 +1076,8 @@ type RoutingSnake struct {
 	NeverProxy             []netip.Prefix `json:"never_proxy_subnets"`
 	AllowConflicting       []netip.Prefix `json:"allow_conflicting_subnets"`
 	RecursionBlockDuration time.Duration  `json:"recursion_block_duration"`
+	VirtualSubnet          netip.Prefix   `json:"virtual_subnet"`
+	AutoResolveConflicts   bool           `json:"auto_resolve_conflicts"`
 }
 
 type DNS struct {
@@ -1119,10 +1174,11 @@ func DNSFromRPC(s *daemon.DNSConfig) *DNS {
 
 func (r *Routing) ToSnake() *RoutingSnake {
 	return &RoutingSnake{
-		Subnets:          r.Subnets,
-		AlsoProxy:        r.AlsoProxy,
-		NeverProxy:       r.NeverProxy,
-		AllowConflicting: r.AllowConflicting,
+		Subnets:              r.Subnets,
+		AlsoProxy:            r.AlsoProxy,
+		NeverProxy:           r.NeverProxy,
+		AllowConflicting:     r.AllowConflicting,
+		AutoResolveConflicts: r.AutoResolveConflicts,
 	}
 }
 

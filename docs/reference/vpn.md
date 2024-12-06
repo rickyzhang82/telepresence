@@ -4,10 +4,15 @@ title: Telepresence and VPNs
 
 # Telepresence and VPNs
 
-It is often important to set up Kubernetes API server endpoints to be only accessible via a VPN.
-In setups like these, users need to connect first to their VPN, and then use Telepresence to connect
-to their cluster. As Telepresence uses many of the same underlying technologies that VPNs use,
-the two can sometimes conflict. This page will help you identify and resolve such VPN conflicts.
+Telepresence creates a virtual network interface (VIF) when it connects. This VIF is configured to route the cluster's 
+service subnet and pod subnets so that the user can access resources in the cluster. It's not uncommon that the
+workstation where Telepresence runs already has network interfaces that route subnets that will overlap. Such
+conflicts must be resolved deterministically.
+
+Unless configured otherwise, Telepresence will resolve subnet conflicts by simply moving the cluster's subnet using
+network address translation. For a majority of use-cases, this will be enough.
+
+For more info, see the section on how to [avoid the conflict](#avoiding-the-conflict) below.
 
 ## VPN Configuration
 
@@ -39,7 +44,7 @@ cluster will place resources in. Let's imagine your cluster is configured to pla
 
 ![VPN Kubernetes config](../images/vpn-k8s-config.jpg)
 
-## Telepresence conflicts
+# Telepresence conflicts
 
 When you run `telepresence connect` to connect to a cluster, it talks to the API server
 to figure out what pod and service CIDRs it needs to map in your machine. If it detects
@@ -53,53 +58,31 @@ telepresence connect: error: connector.Connect: failed to connect to root daemon
 
 Telepresence offers three different ways to resolve this:
 
-- [Allow the conflict](#allowing-the-conflict) in a controlled manner
 - [Avoid the conflict](#avoiding-the-conflict) using the `--proxy-via` connect flag
+- [Allow the conflict](#allowing-the-conflict) in a controlled manner
 - [Use docker](#using-docker) to make telepresence run in a container with its own network config
 
-### Allowing the conflict
 
-One way to resolve this, is to carefully consider what your network layout looks like, and
-then allow Telepresence to override the conflicting subnets.
-Telepresence is refusing to map them, because mapping them could render certain hosts that
-are inside the VPN completely unreachable. However, you (or your network admin) know better
-than anyone how hosts are spread out inside your VPN.
-Even if the private route routes ALL of `10.0.0.0/8`, it's possible that hosts are only
-being spun up in one of the subblocks of the `/8` space. Let's say, for example,
-that you happen to know that all your hosts in the VPN are bunched up in the first
-half of the space -- `10.0.0.0/9` (and that you know that any new hosts will
-only be assigned IP addresses from the `/9` block). In this case you
-can configure Telepresence to override the other half of this CIDR block, which is where the
-services and pods happen to be.
-To do this, all you have to do is configure the `client.routing.allowConflictingSubnets` flag
-in the Telepresence helm chart. You can do this directly via `telepresence helm upgrade`:
+## Avoiding the conflict
 
-```console
-$ telepresence helm upgrade --set client.routing.allowConflictingSubnets="{10.128.0.0/9}"
-```
+Telepresence can perform Virtual Network Address Translation (henceforth referred to as VNAT) of the cluster's subnets
+when routing them from the workstation, thus moving those subnets so that conflicts are avoided. Unless configured not
+to, Telepresence will use VNAT by default when it detects conflicts.
 
-You can also choose to be more specific about this, and only allow the CIDRs that you KNOW
-are in use by the cluster:
+VNAT is enabled by passing a `--vnat` flag (introduced in Telepresence 2.21) to`teleprence connect`. When using this
+flag, Telepresence will take the following  actions:
+
+- The local DNS-server will translate any IP contained in a VNAT subnet to a virtual IP.
+- All access to a virtual IP will be translated back to its original when routed to the cluster. 
+- The container environment retrieved when using `ingest` or `intercept` will be mangled, so that all IPs contained
+   in VNAT subnets are replaced with corresponding virtual IPs.
+
+The `--vnat` flag can be repeated to make Telepresence translate more than one subnet.
 
 ```console
-$ telepresence helm upgrade --set client.routing.allowConflictingSubnets="{10.130.0.0/16,10.132.0.0/16}"
+$ telepresence connect --vnat CIDR
 ```
-
-The end result of this (assuming an allow list of `/9`) will be a configuration like this:
-
-![VPN Telepresence](../images/vpn-with-tele.jpg)
-
-### Avoiding the conflict
-
-An alternative to allowing the conflict is to remap the cluster's CIDRs to virtual CIRDs
-on the workstation by passing a `--proxy-via` flag to `teleprence connect`.
-
-The `telepresence connect` flag `--proxy-via`, introduced in Telepresence 2.19, will allow the local DNS-server to translate cluster subnets to virtual subnets on the workstation, and the VIF to do the reverse translation. The syntax for this new flag, which can be repeated, is:
-
-```console
-$ telepresence connect --proxy-via CIDR=WORKLOAD
-```
-Cluster DNS responses matching CIDR to virtual IPs that are routed (with reverse translation) via WORKLOAD. The CIDR can also be a symbolic name that identifies a subnet or list of subnets:
+The CIDR can also be a symbolic name that identifies a well-known subnet or list of subnets:
 
 | Symbol    | Meaning                             |
 |-----------|-------------------------------------|
@@ -108,38 +91,128 @@ Cluster DNS responses matching CIDR to virtual IPs that are routed (with reverse
 | `pods`    | The cluster's pod subnets.          | 
 | `all`     | All of the above.                   |
 
-The WORKLOAD is the deployment, replicaset, statefulset, or argo-rollout in the cluster whose agent will be used for targeting the routed subnets.
 
-This is useful in two situations:
+### Virtual Subnet Configuration
 
-1. The cluster's subnets collide with subnets otherwise available on the workstation. This is common when using a VPN, in particular if the VPN has a small subnet mask, making the subnet itself very large. The new `--proxy-via` flag can be used as an alternative to [allowing the conflict](#allowing-the-conflict) to take place, give Telepresence precedence, and thus hide the corresponding subnets from the conflicting subnet. The `--proxy-via` will instead reroute the cluster's subnet and hence, avoid the conflict.
-2. The cluster's DNS is configured with domains that resolve to loop-back addresses (this is sometimes the case when the cluster uses a mesh configured to listen to a loopback address and then reroute from there). A loop-back address is not useful on the client, but the `--proxy-via` can reroute the loop-back address to a virtual IP that the client can use.
+Telepresence will use a special subnet when it generates the virtual IPs that are used locally. On a Linux or macOS
+workstation, this subnet will be a class E subnet (not normally used for any other purposes). On Windows, the class E is
+not routed, and Telepresence will instead default to `211.55.48.0/20`.
 
-Subnet proxying is done by the client's DNS-resolver which translates the IPs returned by the cluster's DNS resolver to a virtual IP (VIP) to use on the client. Telepresence's VIF will detect when the VIP is used, and translate it back to the loop-back address on the pod.
+The default subnet used can be overridden in the client configuration.
 
-#### Proxy-via and using IP-addresses directly
+In `config.yml` on the workstation:
+```yaml
+routing:
+  virtualSubnet: 100.10.20.0/24
+```
 
-If the service is using IP-addresses instead of domain-names when connecting to other cluster resources, then such connections will fail when running locally. The `--proxy-via` relies on the local DNS-server to translate the cluster's DNS responses, so that the IP of an `A` or `AAAA` response is replaced with a virtual IP from the configured subnet. If connections are made using an IP instead of a domain-name, then no such lookup is made. Telepresence has no way of detecting the direct use of IP-addresses.
-
-#### Virtual IP Configuration
-
-Telepresence will use a special subnet when it generates the virtual IPs that are used locally. On a Linux or macOS workstation, this subnet will be
-a class E subnet (not normally used for any other purposes). On Windows, the class E is not routed, and Telepresence will instead default to `211.55.48.0/20`.
-
-The default can be changed using the configuration `cluster.virtualIPSubnet`.
+Or as a Helm chart value to be applied on all clients:
+```yaml
+client:
+  routing:
+    virtualSubnet: 100.10.20.0/24
+```
 
 #### Example
 
-Let's assume that we have a conflict between the cluster's subnets, all covered by the CIDR `10.124.0.0/9` and a VPN using `10.0.0.0/9`. We avoid the conflict using:
+Let's assume that we have a conflict between the cluster's subnets, all covered by the CIDR `10.124.0.0/9` and a VPN
+using `10.0.0.0/9`. We avoid the conflict using:
+
+```console
+$ telepresence connect --vnat all
+```
+
+The cluster's subnets are now hidden behind a virtual subnet, and the resulting configuration will look like this:
+
+![VPN Telepresence](../images/vpn-vnat.jpg)
+
+### Proxying via a specific workload
+
+Telepresence is capable of routing all traffic to a VNAT to a specific workload. This is particularly useful when the
+cluster's DNS is configured with domains that resolve to loop-back addresses. This is sometimes the case when the
+cluster uses a mesh configured to listen to a loopback address and then reroute from there.
+
+The `--proxy-via` flag (introduced in Telepresenc 2.19) is similar to `--vnat`, but the argument must be in the form
+CIDR=WORKLOAD. When using this flag, all traffic to the given CIDR will be routed via the given workstation.
+
+The WORKLOAD is the deployment, replicaset, statefulset, or argo-rollout in the cluster whose traffic-agent will be used
+for targeting the routed subnets.
+
+#### Example
+
+Let's assume that we have a conflict between the cluster's subnets, all covered by the CIDR `10.124.0.0/9` and a VPN
+using `10.0.0.0/9`. We avoid the conflict using:
 
 ```console
 $ telepresence connect --proxy-via all=echo
 ```
 
-The cluster's subnets are now hidden behind a virtual subnet, and the resulting configuration will look like this:
+The cluster's subnets are now hidden behind a virtual subnet, and all traffic is routed to the echo workload.
 
-![VPN Telepresence](../images/vpn-proxy-via.jpg)
+### Caveats when using VNAT
+
+Telepresence may not accurately detect cluster-side IP addresses being used by services running locally on a workstation
+in certain scenarios. This limitation arises when local services obtain IP addresses from remote sources such as
+databases or configmaps, or when IP addresses are sent to it in API calls.
+
+### Disabling default VNAT
+
+The default behavior of using VNAT to resolve conflicts can be disabled by adding the following to the client config. 
+
+In `config.yml` on the workstation:
+```yaml
+routing:
+  autoResolveConflicts: false
+```
+
+Or as a Helm chart value to be applied on all clients:
+```yaml
+client:
+  routing:
+    autoResolveConflicts: false
+```
+
+Explicitly allowing all conflicts will also effectively prevent the default VNAT behavior.
+
+## Allowing the conflict
+
+A conflict can be resolved by carefully considering what your network layout looks like, and then allow Telepresence to
+override the conflicting subnets. Telepresence is refusing to map them, because mapping them could render certain hosts
+that are inside the VPN completely unreachable. However, you (or your network admin) know better than anyone how hosts
+are spread out inside your VPN.
+
+Even if the private route routes ALL of `10.0.0.0/8`, it's possible that hosts are only being spun up in one of the
+sub-blocks of the `/8` space. Let's say, for example, that you happen to know that all your hosts in the VPN are bunched
+up in the first half of the space -- `10.0.0.0/9` (and that you know that any new hosts will only be assigned IP
+addresses from the `/9` block). In this case you can configure Telepresence to override the other half of this CIDR
+block, which is where the services and pods happen to be.
+
+To do this, all you have to do is configure the `client.routing.allowConflictingSubnets` flag in the Telepresence helm
+chart. You can do this directly via `telepresence helm upgrade`:
+
+In `config.yml` on the workstation:
+```yaml
+routing:
+  allowConflictingSubnets: 10.128.0.0/9
+```
+
+Or as a Helm chart configuration value to be applied on all clients:
+```yaml
+client:
+  routing:
+    allowConflictingSubnets: 10.128.0.0/9
+```
+
+Or pass the Helm chart configuration using the `--set` flag
+```console
+$ telepresence helm upgrade --set client.routing.allowConflictingSubnets="{10.128.0.0/9}"
+```
+
+The end result of this (assuming an allowlist of `/9`) will be a configuration like this:
+
+![VPN Telepresence](../images/vpn-with-tele.jpg)
 
 ### Using docker
 
-Use `telepresence connect --docker` to make the Telepresence daemon containerized, which means that it has its own network configuration and therefore no conflict with a VPN. Read more about docker [here](docker-run.md).
+Use `telepresence connect --docker` to make the Telepresence daemon containerized, which means that it has its own
+network configuration and therefore no conflict with a VPN. Read more about docker [here](docker-run.md).

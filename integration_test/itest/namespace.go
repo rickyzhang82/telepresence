@@ -25,6 +25,7 @@ type NamespacePair interface {
 	DeleteTemplate(ctx context.Context, path string, values any)
 	AppNamespace() string
 	TelepresenceConnect(ctx context.Context, args ...string) string
+	TelepresenceTryConnect(ctx context.Context, args ...string) (string, error)
 	DeleteSvcAndWorkload(ctx context.Context, workload, name string)
 	Kubectl(ctx context.Context, args ...string) error
 	KubectlOk(ctx context.Context, args ...string) string
@@ -85,12 +86,21 @@ type nsPair struct {
 	Namespaces
 }
 
-// TelepresenceConnect connects using the AppNamespace and ManagerNamespace.
+// TelepresenceConnect connects using the AppNamespace and ManagerNamespace and requires the result to be OK.
 func (s *nsPair) TelepresenceConnect(ctx context.Context, args ...string) string {
 	return TelepresenceOk(ctx,
 		append(
 			[]string{"connect", "--namespace", s.AppNamespace(), "--manager-namespace", s.ManagerNamespace()},
 			args...)...)
+}
+
+// TelepresenceTryConnect connects using the AppNamespace and ManagerNamespace and returns an error on failure.
+func (s *nsPair) TelepresenceTryConnect(ctx context.Context, args ...string) (string, error) {
+	stdout, _, err := Telepresence(ctx,
+		append(
+			[]string{"connect", "--namespace", s.AppNamespace(), "--manager-namespace", s.ManagerNamespace()},
+			args...)...)
+	return stdout, err
 }
 
 func WithNamespacePair(ctx context.Context, suffix string, f func(NamespacePair)) {

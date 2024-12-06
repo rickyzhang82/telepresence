@@ -37,6 +37,21 @@ items:
     date: TBD
     notes:
       - type: feature
+        title: Automatic subnet conflict avoidance
+        body: ->
+          Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it
+          will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a
+          virtual subnet.
+        docs: https://telepresence.io/docs/reference/vpn
+      - type: feature
+        title: Virtual Address Translation (VNAT).
+        body: ->
+          It is now possible to use a virtual subnet without routing the affected IPs to a specific workload. A new
+          `telepresence connect --vnat CIDR` flag was added that will perform virtual network address translation of
+          cluster IPs. This flag is very similar to the `--proxy-via CIDR=WORKLOAD` introduced in 2.19, but without
+          the need to specify a workload.
+        docs: https://telepresence.io/docs/reference/vpn
+      - type: feature
         title: Intercepts targeting a specific container
         body: ->
           In certain scenarios, the container owning the intercepted port differs
@@ -131,6 +146,17 @@ items:
           To achieve this, Telepresence temporarily adds the necessary network to the containerized daemon. This allows the new
           container to join the same network. Additionally, Telepresence starts extra socat containers to handle port mapping,
           ensuring that the desired ports are exposed to the local environment.
+      - type: feature
+        title: Prevent recursion in the Telepresence Virtual Network Interface (VIF)
+        body: >-
+          Network problems may arise when running Kubernetes locally (e.g., Docker Desktop, Kind, Minikube, k3s),
+          because the VIF on the host is also accessible from the cluster's nodes. A request that isn't handled by a
+          cluster resource might be routed back into the VIF and cause a recursion.
+
+          These recursions can now be prevented by setting the client configuration property
+          `routing.recursionBlockDuration` so that new connection attempts are temporarily blocked for a specific
+          IP:PORT pair immediately after an initial attempt, thereby effectively ending the recursion.
+        docs: https://telepresence.io/docs/howtos/cluster-in-vm
       - type: feature
         title: Allow Helm chart to be included as a sub-chart
         body: >-

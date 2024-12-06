@@ -41,6 +41,9 @@ service Daemon {
   // SetLogLevel will temporarily set the log-level for the daemon for a duration that is determined b the request.
   rpc SetLogLevel(manager.LogLevelRequest) returns (google.protobuf.Empty);
 
+  // TranslateEnvIPs translates remote IPs found in the environment to local IPs
+  rpc TranslateEnvIPs(Environment) returns (Environment);
+
   // WaitForNetwork waits for the network of the currently connected session to become ready.
   rpc WaitForNetwork(google.protobuf.Empty) returns (google.protobuf.Empty);
 
@@ -144,4 +147,8 @@ message WaitForAgentIPRequest {
 message WaitForAgentIPResponse {
   // The local IP of the agent (might be virtual)
   bytes local_ip = 1;
+}
+
+message Environment {
+  map<string, string> env = 1;
 }

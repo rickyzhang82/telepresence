@@ -53,6 +53,9 @@ type Request struct {
 
 	// proxyVia holds the string version for the --proxy-via flag values.
 	proxyVia []string
+
+	// vnats holds the string version for the --vnat flag values.
+	vnats []string
 }
 
 type CobraRequest struct {
@@ -82,10 +85,14 @@ func InitRequest(cmd *cobra.Command) *CobraRequest {
 	nwFlags.StringSliceVar(&cr.NeverProxy,
 		"never-proxy", nil, ``+
 			`Comma separated list of CIDR to never proxy`)
+	nwFlags.StringSliceVar(&cr.vnats,
+		"vnat", nil, ``+
+			`Use Network Address Translation to create virtual IPs for the given CIDR. CIDR can be substituted for the `+
+			`symblic name "service", "pods", "also", or "all".`)
 	nwFlags.StringSliceVar(&cr.proxyVia,
 		"proxy-via", nil, ``+
-			`Locally translate cluster DNS responses matching CIDR to virtual IPs that are routed (with reverse `+
-			`translation) via WORKLOAD. Must be in the form CIDR=WORKLOAD. CIDR can be substituted for the symblic name "service", "pods", "also", or "all".`)
+			`Use Network Address Translation to create virtual IPs for the given CIDR, and route via WORKLOAD. Must be in the`+
+			`form CIDR=WORKLOAD. CIDR can be substituted for the symblic name "service", "pods", "also", or "all".`)
 	nwFlags.StringSliceVar(&cr.AllowConflictingSubnets,
 		"allow-conflicting-subnets", nil, ``+
 			`Comma separated list of CIDR that will be allowed to conflict with local subnets`)
@@ -145,6 +152,12 @@ func (cr *CobraRequest) CommitFlags(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+
+	// A --vnat CIDR is the same as --proxy-via CIDR=local
+	for _, vnat := range cr.vnats {
+		cr.proxyVia = append(cr.proxyVia, vnat+"=local")
+	}
+
 	err = cr.setGlobalConnectFlags(cmd)
 	if err != nil {
 		return errcat.User.New(err)

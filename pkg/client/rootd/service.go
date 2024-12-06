@@ -217,6 +217,14 @@ func (s *Service) Disconnect(ctx context.Context, _ *emptypb.Empty) (*emptypb.Em
 	return &emptypb.Empty{}, nil
 }
 
+func (s *Service) TranslateEnvIPs(ctx context.Context, environment *rpc.Environment) (result *rpc.Environment, err error) {
+	err = s.WithSession(func(ctx context.Context, session *Session) error {
+		result = session.translateEnvIPs(ctx, environment)
+		return nil
+	})
+	return result, err
+}
+
 func (s *Service) WaitForNetwork(ctx context.Context, e *emptypb.Empty) (*emptypb.Empty, error) {
 	err := s.WithSession(func(ctx context.Context, session *Session) error {
 		if err, ok := <-session.networkReady(ctx); ok {
@@ -286,7 +294,7 @@ func (s *Service) SetLogLevel(ctx context.Context, request *manager.LogLevelRequ
 }
 
 func (s *Service) configReload(c context.Context) error {
-	return client.Watch(c, func(c context.Context) error {
+	return client.WatchConfig(c, func(c context.Context) error {
 		return client.ReloadDaemonLogLevel(c, true)
 	})
 }

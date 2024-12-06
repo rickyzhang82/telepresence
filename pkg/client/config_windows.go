@@ -1,5 +1,7 @@
 package client
 
+import "net/netip"
+
 type OSSpecificConfig struct {
 	Network Network `json:"network,omitzero"`
 }
@@ -21,11 +23,11 @@ type GSCStrategy string
 
 const (
 	defaultDNSWithFallback = true
-
-	// defaultVirtualIPSubnet is an IP that, on windows, is built from 16 class C subnets which were chosen randomly,
-	// hoping that they don't collide with another subnet.
-	defaultVirtualIPSubnet = "211.55.48.0/20"
 )
+
+// defaultVirtualSubnet is an IP that, on windows, is built from 16 class C subnets which were chosen randomly,
+// hoping that they don't collide with another subnet.
+var defaultVirtualSubnet = netip.MustParsePrefix("211.55.48.0/20") //nolint:gochecknoglobals // constant
 
 type Network struct {
 	DNSWithFallback bool `json:"dnsWithFallback,omitempty"`

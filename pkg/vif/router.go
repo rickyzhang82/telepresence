@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 
 	"github.com/datawire/dlib/dlog"
 	"github.com/telepresenceio/telepresence/v2/pkg/errcat"
@@ -42,22 +43,24 @@ func (rt *Router) ValidateRoutes(ctx context.Context, routes []netip.Prefix) err
 	if err != nil {
 		return err
 	}
-	_, nonWhitelisted := subnet.Partition(routes, func(_ int, r netip.Prefix) bool {
+
+	nonWhitelisted := slices.DeleteFunc(slices.Clone(routes), func(r netip.Prefix) bool {
 		for _, w := range rt.whitelistedSubnets {
 			if subnet.Covers(w, r) {
-				// This is a whitelisted subnet, so we'll overlap it if needed
 				return true
 			}
 		}
 		for _, er := range table {
-			// Route is already in the routing table.
-			if r == er.RoutedNet {
+			if r == er.RoutedNet && er.Interface.Name == rt.device.Name() {
+				// Route is already in the routing table.
 				return true
 			}
 		}
 		return false
 	})
-	// Slightly awkward nested loops, since they can both continue (i.e., there are probably wasted iterations), but it's okay, there's not going to be hundreds of routes.
+
+	// Slightly awkward nested loops, since they can both continue (i.e., there are probably wasted iterations), but it's
+	// okay, there's not going to be hundreds of routes.
 	// In any case, we really wanna run over the table as the outer loop, since it's bigger.
 	for _, tr := range table {
 		dlog.Tracef(ctx, "checking for overlap with route %q", tr)
@@ -79,11 +82,6 @@ func (rt *Router) ValidateRoutes(ctx context.Context, routes []netip.Prefix) err
 }
 
 func (rt *Router) UpdateRoutes(ctx context.Context, pleaseProxy, dontProxy, dontProxyOverrides []netip.Prefix) error {
-	// Don't never-proxy subnets that aren't routed
-	if err := rt.ValidateRoutes(ctx, pleaseProxy); err != nil {
-		return err
-	}
-
 	// Remove all current static routes so that they don't affect the routes for subnets
 	// that we're about to add.
 	rt.dropStaticOverrides(ctx)
@@ -100,13 +98,13 @@ func (rt *Router) UpdateRoutes(ctx context.Context, pleaseProxy, dontProxy, dont
 	})
 
 	// Remove already routed subnets from the pleaseProxy list
-	added, _ := subnet.Partition(pleaseProxy, func(_ int, sn netip.Prefix) bool {
+	added := slices.DeleteFunc(pleaseProxy, func(sn netip.Prefix) bool {
 		for _, d := range rt.routedSubnets {
 			if sn == d {
-				return false
+				return true
 			}
 		}
-		return true
+		return false
 	})
 
 	// Add pleaseProxy subnets to the currently routed subnets

@@ -3,6 +3,7 @@ package dns
 import (
 	"context"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,7 @@ const (
 //	man 5 resolver
 //
 // or, if not on a Mac, follow this link: https://www.manpagez.com/man/5/resolver/
-func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(net.IP, *net.UDPAddr)) error {
+func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(netip.Addr, *net.UDPAddr)) error {
 	resolverDirName := filepath.Join("/etc", "resolver")
 
 	listener, err := newLocalUDPListener(c)
@@ -40,7 +41,7 @@ func (s *Server) Worker(c context.Context, dev vif.Device, configureDNS func(net
 	if err != nil {
 		return err
 	}
-	configureDNS(nil, dnsAddr)
+	configureDNS(netip.Addr{}, dnsAddr)
 
 	err = os.MkdirAll(resolverDirName, 0o755)
 	if err != nil {

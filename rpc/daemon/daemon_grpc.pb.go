@@ -32,6 +32,7 @@ const (
 	Daemon_SetDNSExcludes_FullMethodName        = "/telepresence.daemon.Daemon/SetDNSExcludes"
 	Daemon_SetDNSMappings_FullMethodName        = "/telepresence.daemon.Daemon/SetDNSMappings"
 	Daemon_SetLogLevel_FullMethodName           = "/telepresence.daemon.Daemon/SetLogLevel"
+	Daemon_TranslateEnvIPs_FullMethodName       = "/telepresence.daemon.Daemon/TranslateEnvIPs"
 	Daemon_WaitForNetwork_FullMethodName        = "/telepresence.daemon.Daemon/WaitForNetwork"
 	Daemon_WaitForAgentIP_FullMethodName        = "/telepresence.daemon.Daemon/WaitForAgentIP"
 )
@@ -63,6 +64,8 @@ type DaemonClient interface {
 	SetDNSMappings(ctx context.Context, in *SetDNSMappingsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// SetLogLevel will temporarily set the log-level for the daemon for a duration that is determined b the request.
 	SetLogLevel(ctx context.Context, in *manager.LogLevelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// TranslateEnvIPs translates remote IPs found in the environment to local IPs
+	TranslateEnvIPs(ctx context.Context, in *Environment, opts ...grpc.CallOption) (*Environment, error)
 	// WaitForNetwork waits for the network of the currently connected session to become ready.
 	WaitForNetwork(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// WaitForAgentIP waits for the network of an intercepted agent to become ready.
@@ -177,6 +180,16 @@ func (c *daemonClient) SetLogLevel(ctx context.Context, in *manager.LogLevelRequ
 	return out, nil
 }
 
+func (c *daemonClient) TranslateEnvIPs(ctx context.Context, in *Environment, opts ...grpc.CallOption) (*Environment, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Environment)
+	err := c.cc.Invoke(ctx, Daemon_TranslateEnvIPs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *daemonClient) WaitForNetwork(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -224,6 +237,8 @@ type DaemonServer interface {
 	SetDNSMappings(context.Context, *SetDNSMappingsRequest) (*emptypb.Empty, error)
 	// SetLogLevel will temporarily set the log-level for the daemon for a duration that is determined b the request.
 	SetLogLevel(context.Context, *manager.LogLevelRequest) (*emptypb.Empty, error)
+	// TranslateEnvIPs translates remote IPs found in the environment to local IPs
+	TranslateEnvIPs(context.Context, *Environment) (*Environment, error)
 	// WaitForNetwork waits for the network of the currently connected session to become ready.
 	WaitForNetwork(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// WaitForAgentIP waits for the network of an intercepted agent to become ready.
@@ -264,6 +279,9 @@ func (UnimplementedDaemonServer) SetDNSMappings(context.Context, *SetDNSMappings
 }
 func (UnimplementedDaemonServer) SetLogLevel(context.Context, *manager.LogLevelRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetLogLevel not implemented")
+}
+func (UnimplementedDaemonServer) TranslateEnvIPs(context.Context, *Environment) (*Environment, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TranslateEnvIPs not implemented")
 }
 func (UnimplementedDaemonServer) WaitForNetwork(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WaitForNetwork not implemented")
@@ -464,6 +482,24 @@ func _Daemon_SetLogLevel_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Daemon_TranslateEnvIPs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Environment)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).TranslateEnvIPs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Daemon_TranslateEnvIPs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).TranslateEnvIPs(ctx, req.(*Environment))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Daemon_WaitForNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -546,6 +582,10 @@ var Daemon_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetLogLevel",
 			Handler:    _Daemon_SetLogLevel_Handler,
+		},
+		{
+			MethodName: "TranslateEnvIPs",
+			Handler:    _Daemon_TranslateEnvIPs_Handler,
 		},
 		{
 			MethodName: "WaitForNetwork",

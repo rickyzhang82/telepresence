@@ -7,6 +7,7 @@ import (
 	"io"
 	"slices"
 
+	"github.com/datawire/dlib/dlog"
 	"github.com/telepresenceio/telepresence/rpc/v2/manager"
 )
 
@@ -54,7 +55,12 @@ func (s *session) handleAgentSnapshot(ctx context.Context, infos []*manager.Agen
 		if len(ais) > 0 {
 			if slices.IndexFunc(ais, func(cai *manager.AgentInfo) bool { return cai.PodName == ig.PodName }) < 0 {
 				// The pod selected for the ingest is no longer active, so replace it.
-				ig.AgentInfo = ais[0]
+				ai := ais[0]
+				err := s.translateContainerEnv(ctx, ai, ig.container)
+				if err != nil {
+					dlog.Errorf(ctx, "failed to translate container env: %v", err)
+				}
+				ig.AgentInfo = ai
 			}
 			s.ingestTracker.start(ig.podAccess(s.rootDaemon))
 		}

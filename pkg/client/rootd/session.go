@@ -22,9 +22,6 @@ import (
 	dns2 "github.com/miekg/dns"
 	"github.com/puzpuzpuz/xsync/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -116,7 +113,7 @@ type Session struct {
 	// used in conjunction with systemd-resolved. The current macOS and the overriding solution
 	// will dispatch directly to the local DNS Service without going through the TUN device, but
 	// that may change later if we decide to dispatch to the DNS-server in the cluster.
-	remoteDnsIP net.IP
+	remoteDnsIP netip.Addr
 
 	// dnsLocalAddr is the address of the local DNS Service.
 	dnsLocalAddr *net.UDPAddr
@@ -428,13 +425,13 @@ func (s *Session) clusterLookup(ctx context.Context, q *dns2.Question) (dnsproxy
 			switch rr := rr.(type) {
 			case *dns2.A:
 				var addr netip.Addr
-				addr, err = s.maybeGetVirtualIP(ctx, netip.AddrFrom4([4]byte(rr.A)))
+				addr, err = s.GetLocalIP(ctx, netip.AddrFrom4([4]byte(rr.A)))
 				if err == nil {
 					rr.A = addr.AsSlice()
 				}
 			case *dns2.AAAA:
 				var addr netip.Addr
-				addr, err = s.maybeGetVirtualIP(ctx, netip.AddrFrom16([16]byte(rr.AAAA)))
+				addr, err = s.GetLocalIP(ctx, netip.AddrFrom16([16]byte(rr.AAAA)))
 				if err == nil {
 					rr.AAAA = addr.AsSlice()
 				}
@@ -448,7 +445,7 @@ func (s *Session) clusterLookup(ctx context.Context, q *dns2.Question) (dnsproxy
 	return answer, rCode, err
 }
 
-func (s *Session) maybeGetVirtualIP(ctx context.Context, destinationIP netip.Addr) (netip.Addr, error) {
+func (s *Session) GetLocalIP(ctx context.Context, destinationIP netip.Addr) (netip.Addr, error) {
 	var err error
 	va, ok := s.localTranslationTable.Compute(destinationIP, func(existing netip.Addr, loaded bool) (netip.Addr, bool) {
 		if loaded {
@@ -513,11 +510,7 @@ func (s *Session) getNetworkConfig(ctx context.Context) *rpc.NetworkConfig {
 	} else {
 		d.LocalIP = netip.Addr{}
 	}
-	if len(s.remoteDnsIP) > 0 {
-		d.RemoteIP, _ = netip.AddrFromSlice(s.remoteDnsIP)
-	} else {
-		d.RemoteIP = netip.Addr{}
-	}
+	d.RemoteIP = s.remoteDnsIP
 
 	js, _ := client.MarshalJSON(mc)
 	return &rpc.NetworkConfig{
@@ -526,7 +519,7 @@ func (s *Session) getNetworkConfig(ctx context.Context) *rpc.NetworkConfig {
 	}
 }
 
-func (s *Session) configureDNS(dnsIP net.IP, dnsLocalAddr *net.UDPAddr) {
+func (s *Session) configureDNS(dnsIP netip.Addr, dnsLocalAddr *net.UDPAddr) {
 	s.remoteDnsIP = dnsIP
 	s.dnsLocalAddr = dnsLocalAddr
 }
@@ -615,27 +608,25 @@ func (s *Session) watchClusterInfo(ctx context.Context) error {
 				}
 				break
 			}
-			ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "ClusterInfoUpdate")
 			if err = s.readAdditionalRouting(ctx, mgrInfo); err != nil {
 				return err
 			}
 			select {
 			case <-s.vifReady:
-				if err := s.onClusterInfo(ctx, mgrInfo, span); err != nil {
+				if err := s.onClusterInfo(ctx, mgrInfo); err != nil {
 					if !errors.Is(err, context.Canceled) {
 						dlog.Error(ctx, err)
 					}
 					return err
 				}
 			default:
-				if err = s.onFirstClusterInfo(ctx, mgrInfo, span); err != nil {
+				if err = s.onFirstClusterInfo(ctx, mgrInfo); err != nil {
 					if !errors.Is(err, context.Canceled) {
 						dlog.Error(ctx, err)
 					}
 					return err
 				}
 			}
-			span.End()
 		}
 		dtime.SleepWithContext(ctx, backoff)
 		backoff *= 2
@@ -671,7 +662,7 @@ func (s *Session) createSubnetForDNSOnly(ctx context.Context, mgrInfo *manager.C
 	}
 }
 
-func (s *Session) onFirstClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInfo, span trace.Span) (err error) {
+func (s *Session) onFirstClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInfo) (err error) {
 	defer func() {
 		if err != nil {
 			s.vifReady <- err
@@ -686,14 +677,50 @@ func (s *Session) onFirstClusterInfo(ctx context.Context, mgrInfo *manager.Clust
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	span.SetAttributes(
-		attribute.Bool("tel2.proxy-svcs", s.proxyClusterSvcs),
-		attribute.Bool("tel2.proxy-pods", s.proxyClusterPods),
-	)
-	return s.onClusterInfo(ctx, mgrInfo, span)
+	return s.onClusterInfo(ctx, mgrInfo)
 }
 
-func (s *Session) onClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInfo, span trace.Span) (err error) {
+func (s *Session) defaultRouteDNS(ctx context.Context, mgrInfo *manager.ClusterInfo, dnsAddr netip.Addr, subnets []netip.Prefix) (netip.Addr, []netip.Prefix, error) {
+	// We'll need to synthesize a subnet where we can attach the DNS service when the VIF isn't configured
+	// from cluster subnets. But not on darwin systems, because there the DNS is controlled by /etc/resolver
+	// entries appointing the DNS service directly via localhost:<port>.
+	if s.vipGenerator != nil {
+		if !s.dnsServerSubnet.IsValid() {
+			s.createSubnetForDNSOnly(ctx, mgrInfo)
+		}
+		dlog.Infof(ctx, "Adding Service subnet %s (for DNS only)", s.dnsServerSubnet)
+		var wl string
+		for _, snw := range s.subnetViaWorkloads {
+			if sn, err := netip.ParsePrefix(snw.Subnet); err == nil && sn.Contains(dnsAddr) {
+				wl = snw.Workload
+				if wl == "local" {
+					wl = ""
+				}
+			}
+		}
+		s.localTranslationSubnets = append(s.localTranslationSubnets, agentSubnet{
+			Prefix:   s.dnsServerSubnet,
+			workload: wl,
+		})
+		var err error
+		dnsAddr, err = s.GetLocalIP(ctx, dnsAddr)
+		if err != nil {
+			return dnsAddr, subnets, err
+		}
+	} else {
+		if !s.dnsServerSubnet.IsValid() {
+			s.createSubnetForDNSOnly(ctx, mgrInfo)
+		}
+		dlog.Infof(ctx, "Adding Service subnet %s (for DNS only)", s.dnsServerSubnet)
+		subnets = append(subnets, s.dnsServerSubnet)
+		dnsIP := s.dnsServerSubnet.Addr().AsSlice()
+		dnsIP[len(dnsIP)-1] = 2
+		dnsAddr, _ = netip.AddrFromSlice(dnsIP)
+	}
+	return dnsAddr, subnets, nil
+}
+
+func (s *Session) onClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInfo) (err error) {
 	if s.podDaemon {
 		return nil
 	}
@@ -752,6 +779,12 @@ func (s *Session) onClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInf
 	if !ok {
 		return fmt.Errorf("invalid traffic-manager pod ip address")
 	}
+	if s.vipGenerator != nil {
+		dnsAddr, err = s.GetLocalIP(ctx, dnsAddr)
+		if err != nil {
+			return err
+		}
+	}
 	dnsRouted := false
 	for _, sn := range subnets {
 		if sn.Contains(dnsAddr) {
@@ -760,24 +793,9 @@ func (s *Session) onClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInf
 		}
 	}
 	if runtime.GOOS != "darwin" && !dnsRouted {
-		// We'll need to synthesize a subnet where we can attach the DNS service when the VIF isn't configured
-		// from cluster subnets. But not on darwin systems, because there the DNS is controlled by /etc/resolver
-		// entries appointing the DNS service directly via localhost:<port>.
-		if s.vipGenerator != nil {
-			var err error
-			dnsAddr, err = s.vipGenerator.Next()
-			if err != nil {
-				return nil
-			}
-		} else {
-			if !s.dnsServerSubnet.IsValid() {
-				s.createSubnetForDNSOnly(ctx, mgrInfo)
-			}
-			dlog.Infof(ctx, "Adding Service subnet %s (for DNS only)", s.dnsServerSubnet)
-			subnets = append(subnets, s.dnsServerSubnet)
-			dnsIP := s.dnsServerSubnet.Addr().AsSlice()
-			dnsIP[len(dnsIP)-1] = 2
-			dnsAddr, _ = netip.AddrFromSlice(dnsIP)
+		dnsAddr, subnets, err = s.defaultRouteDNS(ctx, mgrInfo, dnsAddr, subnets)
+		if err != nil {
+			return err
 		}
 		dnsRouted = true
 	}
@@ -794,54 +812,53 @@ func (s *Session) onClusterInfo(ctx context.Context, mgrInfo *manager.ClusterInf
 		dlog.Infof(ctx, "Setting cluster DNS to %s", dnsAddr)
 		dlog.Infof(ctx, "Setting cluster domain to %q", d.ClusterDomain)
 		s.dnsServer.SetClusterDNS(d, dnsAddr)
-		span.SetAttributes(
-			attribute.Stringer("tel2.cluster-dns", dnsAddr),
-			attribute.String("tel2.cluster-domain", d.ClusterDomain),
-		)
 	}
 
 	proxy, neverProxy, neverProxyOverrides := computeNeverProxyOverrides(ctx, subnets, s.neverProxySubnets)
 	s.effectiveNeverProxy = neverProxy
-
-	// Fire and forget to send metrics out.
-	go func() {
-		scout.Report(ctx, "update_routes",
-			scout.Entry{Key: "subnets", Value: len(proxy)},
-			scout.Entry{Key: "allow_conflicting_subnets", Value: len(s.allowConflictingSubnets)},
-		)
-	}()
 	if s.tunVif == nil {
 		return nil
 	}
 	rt := s.tunVif.Router
 	rt.UpdateWhitelist(s.allowConflictingSubnets)
+
+	err = rt.ValidateRoutes(ctx, proxy)
+	if err != nil {
+		if s.vipGenerator != nil || !client.GetConfig(ctx).Routing().AutoResolveConflicts {
+			return err
+		}
+		// Check each subnet and add a translation for those that conflict.
+		for _, pp := range proxy {
+			if routeConflict := rt.ValidateRoutes(ctx, []netip.Prefix{pp}); routeConflict != nil {
+				dlog.Infof(ctx, "Translating IPs in conflicting subnet %s to the virtual subnet", pp)
+				s.subnetViaWorkloads = append(s.subnetViaWorkloads, &rpc.SubnetViaWorkload{
+					Subnet:   pp.String(),
+					Workload: "local",
+				})
+			}
+		}
+		if aErr := s.activateProxyViaWorkloads(ctx); aErr != nil {
+			dlog.Errorf(ctx, "activateProxyViaWorkloads: %v", aErr)
+			return err
+		}
+		return s.onClusterInfo(ctx, mgrInfo)
+	}
+
+	dlog.Debugf(ctx, "UpdatinRoutes %s, %s, %s", proxy, s.effectiveNeverProxy, neverProxyOverrides)
 	return rt.UpdateRoutes(ctx, proxy, s.effectiveNeverProxy, neverProxyOverrides)
 }
 
 func computeNeverProxyOverrides(ctx context.Context, subnets, nvp []netip.Prefix) (proxy, neverProxy, neverProxyOverrides []netip.Prefix) {
-	neverProxy = slices.Clone(nvp)
-	last := len(neverProxy) - 1
-	for i := 0; i <= last; {
-		nps := neverProxy[i]
-		found := false
+	neverProxy = slices.DeleteFunc(slices.Clone(nvp), func(nps netip.Prefix) bool {
 		for _, ds := range subnets {
 			if ds.Overlaps(nps) {
-				found = true
-				break
+				return false
 			}
 		}
-		if !found {
-			// This never-proxy is pointless because it's not a subnet that we are routing
-			dlog.Infof(ctx, "Dropping never-proxy %q because it is not routed", nps)
-			if last > i {
-				neverProxy[i] = neverProxy[last]
-			}
-			last--
-		} else {
-			i++
-		}
-	}
-	neverProxy = neverProxy[:last+1]
+		// This never-proxy is pointless because it's not a subnet that we are routing
+		dlog.Infof(ctx, "Dropping never-proxy %q because it is not routed", nps)
+		return true
+	})
 
 	proxy, neverProxyOverrides = subnet.Partition(subnets, func(i int, isn netip.Prefix) bool {
 		for r, rsn := range subnets {
@@ -933,7 +950,7 @@ func (s *Session) checkSvcConnectivity(ctx context.Context, info *manager.Cluste
 		// Skip checking the cert because its trust chain is loaded into a secret on the cluster; we'd fail to verify it
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Transport: tr}
+	hcl := &http.Client{Transport: tr}
 	tCtx, tCancel := context.WithTimeout(ctx, ct)
 	defer tCancel()
 	url := iputil.JoinHostPort(ip, uint16(port))
@@ -950,7 +967,7 @@ func (s *Session) checkSvcConnectivity(ctx context.Context, info *manager.Cluste
 	}
 	request.Header.Set("Host", info.InjectorSvcHost)
 	dlog.Debugf(ctx, "Performing service connectivity check on %s with Host %s and timeout %s", url, info.InjectorSvcHost, ct)
-	resp, err := client.Do(request)
+	resp, err := hcl.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
 			return false // parent context cancelled
@@ -1036,9 +1053,6 @@ func (s *Session) Start(c context.Context, g *dgroup.Group) error {
 		if clusterCfg.AgentPortForward && clusterCfg.ConnectFromRootDaemon {
 			if k8sclient.CanPortForward(c, s.namespace) {
 				s.agentClients = agentpf.NewClients(s.session)
-				if err := s.activateProxyViaWorkloads(c); err != nil {
-					return err
-				}
 				g.Go("agentPods", func(ctx context.Context) error {
 					return s.agentClients.WatchAgentPods(ctx, rmc.RealManagerClient())
 				})
@@ -1046,6 +1060,9 @@ func (s *Session) Start(c context.Context, g *dgroup.Group) error {
 				dlog.Infof(c, "Agent port-forwards are disabled. Client is not permitted to do port-forward to namespace %s", s.namespace)
 			}
 		}
+	}
+	if err := s.activateProxyViaWorkloads(c); err != nil {
+		return err
 	}
 	if s.podDaemon {
 		return nil
@@ -1144,17 +1161,17 @@ func (s *Session) activateProxyViaWorkloads(ctx context.Context) error {
 	if sl == 0 {
 		return nil
 	}
-	vipSubnet, err := netip.ParsePrefix(client.GetConfig(ctx).Cluster().VirtualIPSubnet)
-	if err != nil {
-		return fmt.Errorf("unable to parse configuration value cluster.virtualIPSubnet: %w", err)
-	}
+	vipSubnet := client.GetConfig(ctx).Routing().VirtualSubnet
 	dlog.Debugf(ctx, "ProxyVIA using subnet %s", vipSubnet)
 
 	s.vipGenerator = vip.NewGenerator(vipSubnet)
 	s.localTranslationSubnets = make([]agentSubnet, sl)
 	for _, wlName := range s.consolidateProxyViaWorkloads(ctx) {
+		if s.agentClients == nil {
+			return errcat.User.Newf("Agent port-forwards are disabled. Client is not permitted to do proxy-via %s", wlName)
+		}
 		dlog.Debugf(ctx, "Ensuring proxy-via agent in %s", wlName)
-		_, err = s.managerClient.EnsureAgent(ctx, &manager.EnsureAgentRequest{
+		_, err := s.managerClient.EnsureAgent(ctx, &manager.EnsureAgentRequest{
 			Session: s.session,
 			Name:    wlName,
 		})
@@ -1197,17 +1214,20 @@ func (s *Session) consolidateProxyViaWorkloads(ctx context.Context) []string {
 		}
 	}
 
-	wlNames := make([]string, len(desiredVips))
+	wlNames := make([]string, 0, len(desiredVips))
 	lcs := make([]agentSubnet, 0, snCount)
-	i := 0
 	for wlName, sns := range desiredVips {
-		wlNames[i] = wlName
-		i++
+		if wlName == "local" {
+			wlName = ""
+		} else {
+			wlNames = append(wlNames, wlName)
+		}
 		for _, sn := range sns {
 			lcs = append(lcs, agentSubnet{Prefix: sn, workload: wlName})
 		}
 	}
 	s.localTranslationSubnets = lcs
+	dlog.Debugf(ctx, "Local translation subnets: %v", s.localTranslationSubnets)
 	return wlNames
 }
 
@@ -1222,7 +1242,9 @@ func (s *Session) waitForProxyViaWorkloads(ctx context.Context) error {
 	// Need unique workload names
 	ws := make([]string, 0, len(s.subnetViaWorkloads))
 	for _, svw := range s.subnetViaWorkloads {
-		ws = slice.AppendUnique(ws, svw.Workload)
+		if svw.Workload != "local" {
+			ws = slice.AppendUnique(ws, svw.Workload)
+		}
 	}
 	for _, wl := range ws {
 		s.agentClients.SetProxyVia(wl)
@@ -1257,6 +1279,29 @@ func (s *Session) SetMappings(ctx context.Context, mappings []*rpc.DNSMapping) {
 	s.dnsServer.SetMappings(mappings)
 }
 
+func (s *Session) translateEnvIPs(ctx context.Context, environment *rpc.Environment) *rpc.Environment {
+	vip.TranslateEnvironmentIPs(ctx, environment.Env, s)
+	return environment
+}
+
+func (s *Session) MapsIPv4() bool {
+	for _, p := range s.localTranslationSubnets {
+		if p.Addr().Is4() {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Session) MapsIPv6() bool {
+	for _, p := range s.localTranslationSubnets {
+		if p.Addr().Is6() {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Session) waitForAgentIP(ctx context.Context, request *rpc.WaitForAgentIPRequest) (*rpc.WaitForAgentIPResponse, error) {
 	if s.agentClients == nil {
 		return nil, status.Error(codes.Unavailable, "")
@@ -1276,7 +1321,7 @@ func (s *Session) waitForAgentIP(ctx context.Context, request *rpc.WaitForAgentI
 		err = status.Error(codes.Internal, err.Error())
 	}
 	if err == nil {
-		ip, err = s.maybeGetVirtualIP(ctx, ip)
+		ip, err = s.GetLocalIP(ctx, ip)
 	}
 	if err != nil {
 		return nil, err

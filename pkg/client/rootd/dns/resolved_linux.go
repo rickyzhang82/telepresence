@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/vif"
 )
 
-func (s *Server) tryResolveD(c context.Context, dev vif.Device, configureDNS func(net.IP, *net.UDPAddr)) error {
+func (s *Server) tryResolveD(c context.Context, dev vif.Device, configureDNS func(netip.Addr, *net.UDPAddr)) error {
 	// Connect to ResolveD via DBUS.
 	if !dbus.IsResolveDRunning(c) {
 		dlog.Error(c, "systemd-resolved is not running")
@@ -35,7 +36,7 @@ func (s *Server) tryResolveD(c context.Context, dev vif.Device, configureDNS fun
 		return err
 	}
 	dnsIP := s.RemoteIP
-	configureDNS(dnsIP.AsSlice(), dnsResolverAddr)
+	configureDNS(dnsIP, dnsResolverAddr)
 
 	g := dgroup.NewGroup(c, dgroup.GroupConfig{})
 
@@ -55,7 +56,7 @@ func (s *Server) tryResolveD(c context.Context, dev vif.Device, configureDNS fun
 			c, cancel := context.WithTimeout(context.WithoutCancel(c), time.Second)
 			defer cancel()
 			dlog.Debugf(c, "Reverting Link settings for %s", dev.Name())
-			configureDNS(nil, nil) // Don't route from TUN-device
+			configureDNS(netip.Addr{}, nil) // Don't route from TUN-device
 			if err = dbus.RevertLink(c, int(dev.Index())); err != nil {
 				dlog.Error(c, err)
 			}

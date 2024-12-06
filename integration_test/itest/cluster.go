@@ -605,7 +605,6 @@ func (s *cluster) GetValuesForHelm(ctx context.Context, values map[string]string
 	nss := GetNamespaces(ctx)
 	settings := []string{
 		"logLevel=debug",
-		"client.routing.allowConflictingSubnets={10.0.0.0/8}",
 	}
 	reg := s.self.Registry()
 	if reg == "local" {
@@ -743,9 +742,7 @@ func (s *cluster) TelepresenceHelmInstall(ctx context.Context, upgrade bool, set
 			Namespaces: nsl,
 		},
 		Client: xClient{
-			Routing: map[string][]string{
-				"allowConflictingSubnets": {"10.0.0.0/8"},
-			},
+			Routing: map[string][]string{},
 		},
 		Timeouts: xTimeouts{AgentArrival: "60s"},
 	}

@@ -45,7 +45,7 @@ func (c *config) Run(ctx context.Context) error {
 	dlog.Infof(ctx, "Started watcher for ConfigMap %s", cfgConfigMapName)
 	defer dlog.Infof(ctx, "Ended watcher for ConfigMap %s", cfgConfigMapName)
 
-	// The Watch will perform a http GET call to the kubernetes API server, and that connection will not remain open forever
+	// The WatchConfig will perform a http GET call to the kubernetes API server, and that connection will not remain open forever
 	// so when it closes, the watch must start over. This goes on until the context is cancelled.
 	api := k8sapi.GetK8sInterface(ctx).CoreV1()
 	for ctx.Err() == nil {

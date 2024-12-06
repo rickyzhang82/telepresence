@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -48,8 +49,8 @@ intercept:
   appProtocolStrategy: portName
   defaultPort: 9080
   useFtp: true
-cluster:
-  virtualIPSubnet: 192.169.0.0/16
+routing:
+  virtualSubnet: 192.169.0.0/16
 `,
 	}
 
@@ -90,7 +91,7 @@ cluster:
 	assert.Equal(t, 9080, cfg.Intercept().DefaultPort)                                           // from user
 	assert.True(t, cfg.Intercept().UseFtp)                                                       // from user
 	assert.Equal(t, cfg.Cluster().DefaultManagerNamespace, "hello")                              // from sys1
-	assert.Equal(t, cfg.Cluster().VirtualIPSubnet, "192.169.0.0/16")                             // from user
+	assert.Equal(t, cfg.Routing().VirtualSubnet, netip.MustParsePrefix("192.169.0.0/16"))        // from user
 }
 
 func Test_ConfigMarshalYAML(t *testing.T) {
