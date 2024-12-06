@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -63,7 +64,7 @@ func (s *proxyViaSuite) Test_ProxyViaLoopBack() {
 	ctx := s.Context()
 	if s.IsIPv6() {
 		ctx = itest.WithConfig(ctx, func(config client.Config) {
-			config.Cluster().VirtualIPSubnet = "abac:0de0::/64"
+			config.Routing().VirtualSubnet = netip.MustParsePrefix("abac:0de0::/64")
 		})
 	}
 
@@ -77,8 +78,7 @@ func (s *proxyViaSuite) Test_ProxyViaLoopBack() {
 	}
 	defer itest.TelepresenceQuitOk(ctx)
 
-	_, virtualIPSubnet, err := net.ParseCIDR(client.GetConfig(ctx).Cluster().VirtualIPSubnet)
-	s.Require().NoError(err)
+	virtualSubnet := client.GetConfig(ctx).Routing().VirtualSubnet
 
 	tests := []struct {
 		name           string
@@ -100,10 +100,10 @@ func (s *proxyViaSuite) Test_ProxyViaLoopBack() {
 		tt := tt
 		s.Run(tt.name, func() {
 			rq := s.Require()
-			var ips []net.IP
+			var vip netip.Addr
 			rq.Eventually(func() bool {
 				// hostname will resolve to 127.0.0.1 remotely and then be translated into a virtual IP
-				ips, err = net.LookupIP(tt.hostName)
+				ips, err := net.LookupIP(tt.hostName)
 				if err != nil {
 					dlog.Error(ctx, err)
 					return false
@@ -112,11 +112,12 @@ func (s *proxyViaSuite) Test_ProxyViaLoopBack() {
 					dlog.Error(ctx, "LookupIP did not return one IP")
 					return false
 				}
-				return true
+				var ok bool
+				vip, ok = netip.AddrFromSlice(ips[0])
+				return ok
 			}, 30*time.Second, 2*time.Second)
-			vip := ips[0]
 			dlog.Infof(ctx, "%s uses IP %s", tt.hostName, vip)
-			rq.Truef(virtualIPSubnet.Contains(vip), "virtualIPSubnet %s does not contain %s", virtualIPSubnet, vip)
+			rq.Truef(virtualSubnet.Contains(vip), "virtualIPSubnet %s does not contain %s", virtualSubnet, vip)
 
 			rq.Eventually(func() bool {
 				out, err := itest.Output(ctx, "curl", "--silent", "--max-time", "2", net.JoinHostPort(tt.hostName, "8080"))
@@ -139,7 +140,7 @@ func (s *proxyViaSuite) Test_ProxyViaEverything() {
 
 	if s.IsIPv6() {
 		ctx = itest.WithConfig(ctx, func(config client.Config) {
-			config.Cluster().VirtualIPSubnet = "abac:0de0::/64"
+			config.Routing().VirtualSubnet = netip.MustParsePrefix("abac:0de0::/64")
 		})
 	}
 
@@ -165,7 +166,7 @@ func (s *proxyViaSuite) Test_ProxyViaAll() {
 	rq := s.Require()
 	if s.IsIPv6() {
 		ctx = itest.WithConfig(ctx, func(config client.Config) {
-			config.Cluster().VirtualIPSubnet = "abac:0de0::/64"
+			config.Routing().VirtualSubnet = netip.MustParsePrefix("abac:0de0::/64")
 		})
 	}
 
@@ -189,7 +190,7 @@ func (s *proxyViaSuite) Test_ProxyViaAllAndMounts() {
 	rq := s.Require()
 	if s.IsIPv6() {
 		ctx = itest.WithConfig(ctx, func(config client.Config) {
-			config.Cluster().VirtualIPSubnet = "abac:0de0::/64"
+			config.Routing().VirtualSubnet = netip.MustParsePrefix("abac:0de0::/64")
 		})
 	}
 

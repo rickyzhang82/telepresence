@@ -517,9 +517,15 @@ func (s *session) AddIntercept(c context.Context, ir *rpc.CreateInterceptRequest
 				return InterceptError(common.InterceptError_FAILED_TO_ESTABLISH, client.CheckTimeout(c, c.Err()))
 			case <-wr.mountsDone:
 			}
+
 			if er := self.InterceptEpilog(c, ir, result); er != nil {
 				return er
 			}
+			env, err := s.rootDaemon.TranslateEnvIPs(c, &daemon.Environment{Env: result.InterceptInfo.Environment})
+			if err != nil {
+				return InterceptError(common.InterceptError_INTERNAL, client.CheckTimeout(c, err))
+			}
+			result.InterceptInfo.Environment = env.Env
 			success = true // Prevent removal in deferred function
 			return result
 		}

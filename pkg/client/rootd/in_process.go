@@ -105,6 +105,11 @@ func (rd *InProcSession) SetLogLevel(context.Context, *manager.LogLevelRequest, 
 	return &empty.Empty{}, nil
 }
 
+func (rd *InProcSession) TranslateEnvIPs(ctx context.Context, in *rpc.Environment, opts ...grpc.CallOption) (*rpc.Environment, error) {
+	in = rd.translateEnvIPs(ctx, in)
+	return in, nil
+}
+
 func (rd *InProcSession) WaitForNetwork(ctx context.Context, _ *empty.Empty, _ ...grpc.CallOption) (*empty.Empty, error) {
 	if err, ok := <-rd.networkReady(ctx); ok {
 		return &empty.Empty{}, status.Error(codes.Unavailable, err.Error())

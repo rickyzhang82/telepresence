@@ -37,6 +37,21 @@ items:
     date: TBD
     notes:
       - type: feature
+        title: Automatic subnet conflict avoidance
+        body: ->
+          Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it
+          will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a
+          virtual subnet.
+        docs: https://telepresence.io/docs/reference/vpn
+      - type: feature
+        title: Virtual Address Translation (VNAT).
+        body: ->
+          It is now possible to use a virtual subnet without routing the affected IPs to a specific workload. A new
+          `telepresence connect --vnat CIDR` flag was added that will perform virtual network address translation of
+          cluster IPs. This flag is very similar to the `--proxy-via CIDR=WORKLOAD` introduced in 2.19, but without
+          the need to specify a workload.
+        docs: https://telepresence.io/docs/reference/vpn
+      - type: feature
         title: Intercepts targeting a specific container
         body: ->
           In certain scenarios, the container owning the intercepted port differs

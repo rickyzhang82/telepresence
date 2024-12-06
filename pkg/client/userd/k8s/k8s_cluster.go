@@ -264,7 +264,7 @@ func (kc *Cluster) determineTrafficManagerNamespace(c context.Context) (string, 
 // GetCurrentNamespaces returns the names of the namespaces that this client
 // is mapping. If the forClientAccess is true, then the namespaces are restricted
 // to those where an intercept can take place, i.e. the namespaces where this
-// client can Watch and get services and deployments.
+// client can WatchConfig and get services and deployments.
 func (kc *Cluster) GetCurrentNamespaces(forClientAccess bool) []string {
 	kc.nsLock.Lock()
 	nss := make([]string, 0, len(kc.currentMappedNamespaces))

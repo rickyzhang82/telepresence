@@ -154,6 +154,11 @@ func (s *session) Ingest(ctx context.Context, rq *rpc.IngestRequest) (ir *rpc.In
 		return nil, fmt.Errorf("workload %s has no container named %s", ik.workload, ik.container)
 	}
 
+	err = s.translateContainerEnv(ctx, ai, ik.container)
+	if err != nil {
+		return nil, err
+	}
+
 	ig, loaded := s.currentIngests.LoadOrCompute(ik, func() *ingest {
 		ctx, cancel := context.WithCancel(ctx)
 		cancelIngest := func() {
@@ -176,6 +181,19 @@ func (s *session) Ingest(ctx context.Context, rq *rpc.IngestRequest) (ir *rpc.In
 		s.ingestTracker.initialStart(ig.podAccess(s.rootDaemon))
 	}
 	return ig.response(), nil
+}
+
+func (s *session) translateContainerEnv(ctx context.Context, ai *manager.AgentInfo, container string) error {
+	cn, ok := ai.Containers[container]
+	if !ok {
+		return fmt.Errorf("workload %s has no container named %s", ai.Name, container)
+	}
+	env, err := s.rootDaemon.TranslateEnvIPs(ctx, &daemon.Environment{Env: cn.Environment})
+	if err != nil {
+		return err
+	}
+	cn.Environment = env.Env
+	return nil
 }
 
 func (s *session) getCurrentIngests() []*rpc.IngestInfo {

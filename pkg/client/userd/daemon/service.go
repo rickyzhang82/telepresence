@@ -205,7 +205,7 @@ func (s *service) configReload(c context.Context) error {
 	if err := os.MkdirAll(filepath.Dir(client.GetConfigFile(c)), 0o755); err != nil {
 		return err
 	}
-	return client.Watch(c, func(ctx context.Context) error {
+	return client.WatchConfig(c, func(ctx context.Context) error {
 		s.sessionLock.RLock()
 		defer s.sessionLock.RUnlock()
 		if s.session == nil {

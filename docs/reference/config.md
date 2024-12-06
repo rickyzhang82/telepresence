@@ -51,7 +51,6 @@ Values for `client.cluster` controls aspects on how client's connection to the t
 | `mappedNamespaces`        | Namespaces that will be mapped by default.                         | [sequence][yaml-seq] of [strings][yaml-str] | `[]`               |
 | `connectFromRootDaeamon`  | Make connections to the cluster directly from the root daemon.     | [boolean][yaml-bool]                        | `true`             |
 | `agentPortForward`        | Let telepresence-client use port-forwards directly to agents       | [boolean][yaml-bool]                        | `true`             |
-| `virtualIPSubnet`         | The CIDR to use when generating virtual IPs                        | [CIDR][cidr]                                | platform dependent |
 
 ### DNS
 
@@ -208,12 +207,14 @@ Then all of the `alsoProxySubnets` of `10.0.0.0/16` will be proxied, with the ex
 
 These are the valid fields for the `client.routing` key:
 
-| Field                     | Description                                                                            | Type                    | 
-|---------------------------|----------------------------------------------------------------------------------------|-------------------------|
-| `alsoProxySubnets`        | Proxy these subnets in addition to the service and pod subnets                         | [CIDR][cidr]            | 
-| `neverProxySubnets`       | Do not proxy these subnets                                                             | [CIDR][cidr]            | 
-| `allowConflictingSubnets` | Give Telepresence precedence when these subnets conflict with other network interfaces | [CIDR][cidr]            | 
-| `recursionBlockDuration`  | Prevent recursion in VIF for this duration after a connect                             | [duration][go-duration] | 
+| Field                     | Description                                                                            | Type                    | Default            |
+|---------------------------|----------------------------------------------------------------------------------------|-------------------------|--------------------|
+| `alsoProxySubnets`        | Proxy these subnets in addition to the service and pod subnets                         | [CIDR][cidr]            |                    |
+| `neverProxySubnets`       | Do not proxy these subnets                                                             | [CIDR][cidr]            |                    |
+| `allowConflictingSubnets` | Give Telepresence precedence when these subnets conflict with other network interfaces | [CIDR][cidr]            |                    |
+| `recursionBlockDuration`  | Prevent recursion in VIF for this duration after a connect                             | [duration][go-duration] |                    |
+| `virtualSubnet`           | The CIDR to use when generating virtual IPs                                            | [CIDR][cidr]            | platform dependent |
+| `autoResolveConflicts`    | Auto resolve conflicts using a virtual subnet                                          | [bool][yaml-bool]       | true               |
 
 
 ### Timeouts

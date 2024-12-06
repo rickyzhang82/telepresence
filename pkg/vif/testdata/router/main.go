@@ -81,6 +81,11 @@ func main() {
 		}
 	}
 	dev.Router.UpdateWhitelist(whitelist)
+	err = dev.Router.ValidateRoutes(ctx, yesRoutes)
+	if err != nil {
+		return
+	}
+
 	err = dev.Router.UpdateRoutes(ctx, yesRoutes, noRoutes, nil)
 	if err != nil {
 		return
