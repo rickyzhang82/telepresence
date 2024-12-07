@@ -23,7 +23,7 @@ All requests from and to the cluster go through this Daemon.
 
 ### Root-Daemon
 The Root-Daemon manages the networking necessary to handle traffic between the local workstation and the cluster by setting up a
-[Virtual Network Device](tun-device.md) (VIF).  For a detailed description of how the VIF manages traffic and why it is necessary
+[Virtual Network Device](tun-device.md) (VIF). For a detailed description of how the VIF manages traffic and why it is necessary
 please refer to this blog post:
 [Implementing Telepresence Networking with a TUN Device](https://blog.getambassador.io/implementing-telepresence-networking-with-a-tun-device-a23a786d51e9).
 
@@ -42,5 +42,7 @@ The Traffic Agent is a sidecar container that facilitates ingests and intercepts
 started, the Traffic Agent container is injected into the workload's pod(s). You can see the Traffic Agent's status by
 running `telepresence list` or `kubectl describe pod <pod-name>`.
 
-Depending on the type of intercept that gets created, the Traffic Agent will either route the incoming request  to a 
-developer's workstation, or it will pass it along to the container in the pod usually handling requests on that port.
+Depending on if an intercept is active or not, the Traffic Agent will either route the incoming request  to a 
+your workstation, or it will pass it along to the container in the pod usually handling requests on that port.
+
+Please see [Traffic Agent Sidecar](intercepts/sidecar.md) for details.

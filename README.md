@@ -400,7 +400,7 @@ $ telepresence helm uninstall
 will remove everything that was automatically installed by telepresence from the cluster.
 
 ```console
-$ telepresence uninstall --agent hello
+$ telepresence uninstall hello
 ```
 will remove the traffic-agent and the configmap entry.
 

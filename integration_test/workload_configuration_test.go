@@ -50,7 +50,7 @@ func (s *workloadConfigurationSuite) disabledWorkloadKind(tp, wl string) {
 func (s *workloadConfigurationSuite) uninstallAgents(ctx context.Context, wl string) {
 	dfltCtx := itest.WithUser(ctx, "default")
 	itest.TelepresenceOk(dfltCtx, "connect", "--namespace", s.AppNamespace(), "--manager-namespace", s.ManagerNamespace())
-	itest.TelepresenceOk(dfltCtx, "uninstall", "--agent", wl)
+	itest.TelepresenceOk(dfltCtx, "uninstall", wl)
 	itest.TelepresenceDisconnectOk(dfltCtx)
 }
 
