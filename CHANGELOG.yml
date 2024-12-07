@@ -42,7 +42,7 @@ items:
           Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it
           will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a
           virtual subnet.
-        docs: https://telepresence.io/docs/reference/vpn
+        docs: reference/vpn
       - type: feature
         title: Virtual Address Translation (VNAT).
         body: ->
@@ -50,7 +50,7 @@ items:
           `telepresence connect --vnat CIDR` flag was added that will perform virtual network address translation of
           cluster IPs. This flag is very similar to the `--proxy-via CIDR=WORKLOAD` introduced in 2.19, but without
           the need to specify a workload.
-        docs: https://telepresence.io/docs/reference/vpn
+        docs: reference/vpn
       - type: feature
         title: Intercepts targeting a specific container
         body: ->
@@ -64,7 +64,7 @@ items:
           guarantees that the environment variables and mounts propagated to the
           client originate from the specified container. Additionally, if the
           `--replace` option is used, it ensures that this container is replaced.
-        docs: https://telepresence.io/docs/reference/intercepts/container
+        docs: reference/intercepts/container
       - type: feature
         title: New telepresence ingest command
         body: >-
@@ -105,7 +105,7 @@ items:
 
           While the old-style Kubernetes extension is still supported for compatibility, it cannot be used with the new
           style.
-        docs: https://telepresence.io/docs/reference/config
+        docs: reference/config
       - type: feature
         title: Use WebSockets for port-forward instead of the now deprecated SPDY.
         body: >-
@@ -131,7 +131,7 @@ items:
         body: >-
           The auto-completion of namespaces, services, and containers have been added where appropriate, and the default
           file auto completion has been removed from most commands.
-      - feature:
+      - type: feature
         title: Docker run flags --publish, --expose, and --network now work with docker mode connections
         body: >-
           After establishing a connection to a cluster using `telepresence connect --docker`, you can run new containers that share
@@ -156,7 +156,7 @@ items:
           These recursions can now be prevented by setting the client configuration property
           `routing.recursionBlockDuration` so that new connection attempts are temporarily blocked for a specific
           IP:PORT pair immediately after an initial attempt, thereby effectively ending the recursion.
-        docs: https://telepresence.io/docs/howtos/cluster-in-vm
+        docs: howtos/cluster-in-vm
       - type: feature
         title: Allow Helm chart to be included as a sub-chart
         body: >-
