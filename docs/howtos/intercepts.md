@@ -48,8 +48,8 @@ network telepresence, and remote mounts must be made relative to a specific moun
    ```
 
 3. Get the name of the port you want to intercept on your service:
-   `kubectl get service <service name> --output yaml`.
-  
+   `kubectl get service &lt;service name&gt; --output yaml`.
+
    If we assume that the service and deployment use the same name:
 
    ```console
@@ -65,7 +65,7 @@ network telepresence, and remote mounts must be made relative to a specific moun
 
 4. Intercept all traffic going to the application in your cluster:
     ```
-    telepresence intercept <workload-name> --port [<local-port>][:<remote-port>] --env-file <path-to-env-file>`.
+    telepresence intercept &lt;workload-name&gt; --port [&lt;local-port&gt;][:&lt;remote-port&gt;] --env-file &lt;path-to-env-file&gt;`.
     ```
 
    * For `--port`: specify the port the local instance of your application is running on. If the intercepted service exposes multiple ports, specify the port you want to intercept after a colon.
@@ -84,8 +84,8 @@ network telepresence, and remote mounts must be made relative to a specific moun
       Intercepting  : all TCP connections
     ```
 
-5. <a name="start-local-instance"></a>Start your local application using the environment variables retrieved in the previous step.
-  The following are some examples of how to pass the environment variables to your local process:
+5. &lt;a name="start-local-instance"&gt;&lt;/a&gt;Start your local application using the environment variables retrieved in the previous step.
+   The following are some examples of how to pass the environment variables to your local process:
    * **Visual Studio Code:** specify the path to the environment variables file in the `envFile` field of your configuration.
    * **JetBrains IDE (IntelliJ, WebStorm, PyCharm, GoLand, etc.):** use the [EnvFile plugin](https://plugins.jetbrains.com/plugin/7861-envfile).
 
@@ -128,7 +128,7 @@ present challenges in terms of toolchain integration, debugging, and the overall
    ```
 
 3. Get the name of the port you want to intercept on your service:
-   `kubectl get service <service name> --output yaml`.
+   `kubectl get service &lt;service name&gt; --output yaml`.
 
    If we assume that the service and deployment use the same name:
 
@@ -145,18 +145,18 @@ present challenges in terms of toolchain integration, debugging, and the overall
 
 4. Intercept all traffic going to the application in your cluster, and start a local container to handle that intercept:
     ```
-    telepresence intercept <workload-name> --port [<local-port>][:<remote-port>] --docker-run -- <your local container>.
+    telepresence intercept &lt;workload-name&gt; --port [&lt;local-port&gt;][:&lt;remote-port&gt;] --docker-run -- &lt;your local container&gt;.
     ```
 
-    * For `--port`: If the intercepted service exposes multiple ports, specify the service port you want to intercept after a colon.
-      The local port can be empty to default to the same as the targeted container port.
- 
+   * For `--port`: If the intercepted service exposes multiple ports, specify the service port you want to intercept after a colon.
+     The local port can be empty to default to the same as the targeted container port.
+
    The example below shows Telepresence intercepting traffic going to deployment `example-app`. The local container inherits
    the environment and the volume mounts from the targeted container, and requests to the service on port `http` in the
    cluster get routed to the local container and the environment variables of the service are written to `~/example-app-intercept.env`.
 
     ```console
-    $ telepresence intercept example-app --port :http --docker-run -- <your local container>
+    $ telepresence intercept example-app --port :http --docker-run -- &lt;your local container&gt;
     Using Deployment example-app
     intercepted
       Intercept name: example-app
@@ -164,7 +164,7 @@ present challenges in terms of toolchain integration, debugging, and the overall
       Workload kind : Deployment
       Destination   : 127.0.0.1:8080
       Intercepting  : all TCP connections
-    <output from your local container>
+    &lt;output from your local container&gt;
     ```
 
 5. Query the cluster in which you intercepted an application and verify your local instance being invoked.
@@ -183,7 +183,7 @@ but you don't wish to intercept any traffic intended for the targeted workload. 
 comes into play. Just like intercept, it will make the environment and mounted containers of the targeted container available locally,
 but it will not intercept any traffic.
 
-This example assumes that you have the `example-app` 
+This example assumes that you have the `example-app`
 
 ### Running everything directly on the workstation
 
@@ -192,7 +192,7 @@ This example assumes that you have the `example-app`
     $ telepresence connect
     Launching Telepresence User Daemon
     Launching Telepresence Root Daemon
-    Connected to context xxx, namespace default (https://<some url>)
+    Connected to context xxx, namespace default (https://&lt;some url&gt;)
     $ telepresence ingest example-app --env-file ~/example-app-intercept.env
     Using Deployment example-app
        Container         : example-app
@@ -210,16 +210,16 @@ You can now:
 
 1. Connect using docker start an ingest from `example-app`, and run a container locally with the ingested environment and volume mounts:
     ```console
-    t connect --docker
+    $ telepresence connect --docker
     Launching Telepresence User Daemon
-    Connected to context xxx, namespace default (https://<some url>)
-    $ telepresence ingest example-app --expose 8080 --docker-run -- <your local container>
+    Connected to context xxx, namespace default (https://&lt;some url&gt;)
+    $ telepresence ingest example-app --expose 8080 --docker-run -- &lt;your local container&gt;
     Using Deployment example-app, container example-app
-    <output from your local container>
+    &lt;output from your local container&gt;
    ```
 
 You can now:
 - Code and debug your local container while it interacts with other services in your cluster.
-- Send request to your local container using localhost:<local port>
+- Send request to your local container using localhost:&lt;local port&gt;
 - Query services only exposed in your cluster's network using `telepresence curl`.
 - Set breakpoints in a _Remote Debug_ configuration in your IDE to investigate bugs.
