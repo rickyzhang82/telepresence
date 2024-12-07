@@ -542,6 +542,9 @@ func (t *Timeouts) defaults() DefaultsAware {
 // merge merges this instance with the non-zero values of the given argument. The argument values take priority.
 func (t *Timeouts) merge(o *Timeouts) {
 	mergeNonDefaults(t, o)
+	if t.PrivateConnectivityCheck > 5*time.Second {
+		t.PrivateConnectivityCheck = 5 * time.Second
+	}
 }
 
 // IsZero controls whether this element will be included in marshalled output.
