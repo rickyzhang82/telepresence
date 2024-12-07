@@ -37,7 +37,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
 	github.com/telepresenceio/go-fuseftp/rpc v0.5.0
-	github.com/telepresenceio/telepresence/rpc/v2 v2.20.3
+	github.com/telepresenceio/telepresence/rpc/v2 v2.21.0-rc.0
 	github.com/vishvananda/netlink v1.3.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.57.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.57.0
