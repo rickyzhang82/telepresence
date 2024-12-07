@@ -162,6 +162,9 @@ shortens the time for the test with about 20 seconds.
  - You will need to have [mockgen](https://github.com/golang/mock) installed
    to generate new or updated testing mocks for interfaces.
 
+ - You will need to have [argo-rollouts](https://github.com/argoproj/argo-rollouts) (including kubectl-argo-rollouts) installed
+   if you interact with functionality that relies on it.
+
 ## Build the binary, push the image
 
 The easiest thing to do to get going:
@@ -240,7 +243,7 @@ visually modify test output; this happens even running locally, since the json o
 is piped to the tool anyway:
 
 ```console
-$ DEV_TELEPRESENCE_GENERATE_GOLD=y go test -run=TestAddAgentToWorkload ./pkg/client/userd/trafficmgr
+$ make check-unit
 ```
 
 ## Building for Release
