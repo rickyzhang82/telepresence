@@ -77,8 +77,6 @@ github.com/datawire/envconfig v0.0.0-20221012222025-09524dc7d59b h1:QXkFwAQPkOoX
 github.com/datawire/envconfig v0.0.0-20221012222025-09524dc7d59b/go.mod h1:3SpNv+sKT10l7Gt88j8Eyk4Rd5FhMCnEYbfPo4Ee/e4=
 github.com/datawire/go-ftpserver v0.1.3 h1:3kEzcPLG9jcP5oUpXHEKF2P8v0GxcpzSjNfwxEWZG+U=
 github.com/datawire/go-ftpserver v0.1.3/go.mod h1:H9RuaneDn4sT3AaZwBmgYVfMTFLtbUmNs7Lj1UTWDYc=
-github.com/datawire/go-fuseftp/rpc v0.4.6 h1:rQ7/sfj0pjLMPh47N7IdoTHOYRfXXQREHcTJ405d4jk=
-github.com/datawire/go-fuseftp/rpc v0.4.6/go.mod h1:1kQtyrQDeIMXXI9a8YdQ94jNzCxLTbLP2iSSDS6akis=
 github.com/datawire/k8sapi v0.1.6-0.20240820125232-ee712486e677 h1:ZckPUncGzmUmSrNMJRZr8mbTPU3uDu8N2RWdLJZY8j0=
 github.com/datawire/k8sapi v0.1.6-0.20240820125232-ee712486e677/go.mod h1:wZOWo+KiWs6+oBXfIQsj3VbArkvQqiP83WtukLmAMRU=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -401,6 +399,8 @@ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/telepresenceio/go-fuseftp/rpc v0.5.0 h1:OruBUIe2LcOuNX+BTATZL4v8JjlA0d3foM8i8wv4FrE=
+github.com/telepresenceio/go-fuseftp/rpc v0.5.0/go.mod h1:vA6l+nLsyVHs3Wu1r9BQEO4+ZhL2sCZP+Jmqptdnn9E=
 github.com/vishvananda/netlink v1.3.0 h1:X7l42GfcV4S6E4vHTsw48qbrV+9PVojNfIhZcwQdrZk=
 github.com/vishvananda/netlink v1.3.0/go.mod h1:i6NetklAujEcC6fK0JPjT8qSwWyO0HLn4UKG+hGqeJs=
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=

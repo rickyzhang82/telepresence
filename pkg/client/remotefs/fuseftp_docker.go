@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/datawire/go-fuseftp/rpc"
+	"github.com/telepresenceio/go-fuseftp/rpc"
 )
 
 type fuseFtpMgr struct{}

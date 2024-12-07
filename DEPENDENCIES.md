@@ -31,7 +31,6 @@ following Free and Open Source software:
     github.com/datawire/dtest                                                    v0.0.0-20210928162311-722b199c4c2f    Apache License 2.0
     github.com/datawire/envconfig                                                v0.0.0-20221012222025-09524dc7d59b    Apache License 2.0
     github.com/datawire/go-ftpserver                                             v0.1.3                                Apache License 2.0
-    github.com/datawire/go-fuseftp/rpc                                           v0.4.6                                Apache License 2.0
     github.com/datawire/k8sapi                                                   v0.1.6-0.20240820125232-ee712486e677  Apache License 2.0
     github.com/davecgh/go-spew                                                   v1.1.2-0.20180830191138-d8f796af33cc  ISC license
     github.com/distribution/reference                                            v0.6.0                                Apache License 2.0
@@ -131,6 +130,7 @@ following Free and Open Source software:
     github.com/spf13/cobra                                                       v1.8.1                                Apache License 2.0
     github.com/spf13/pflag                                                       v1.0.5                                3-clause BSD license
     github.com/stretchr/testify                                                  v1.10.0                               MIT license
+    github.com/telepresenceio/go-fuseftp/rpc                                     v0.5.0                                Apache License 2.0
     github.com/telepresenceio/telepresence/rpc/v2                                (modified)                            Apache License 2.0
     github.com/vishvananda/netlink                                               v1.3.0                                Apache License 2.0
     github.com/vishvananda/netns                                                 v0.0.5                                Apache License 2.0

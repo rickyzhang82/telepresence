@@ -12,7 +12,6 @@ require (
 	github.com/datawire/dtest v0.0.0-20210928162311-722b199c4c2f
 	github.com/datawire/envconfig v0.0.0-20221012222025-09524dc7d59b
 	github.com/datawire/go-ftpserver v0.1.3
-	github.com/datawire/go-fuseftp/rpc v0.4.6
 	github.com/datawire/k8sapi v0.1.6-0.20240820125232-ee712486e677
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-connections v0.5.0
@@ -37,6 +36,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
+	github.com/telepresenceio/go-fuseftp/rpc v0.5.0
 	github.com/telepresenceio/telepresence/rpc/v2 v2.20.3
 	github.com/vishvananda/netlink v1.3.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.57.0
