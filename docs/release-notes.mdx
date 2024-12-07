@@ -9,29 +9,29 @@ import { Note, Title, Body } from '@site/src/components/ReleaseNotes'
 # Telepresence Release Notes
 ## Version 2.21.0
 <Note>
-	<Title type="feature" docs="https://telepresence.io/docs/reference/vpn">Automatic subnet conflict avoidance</Title>
-	<Body>-> Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a virtual subnet.</Body>
+	<Title type="feature" docs="reference/vpn">Automatic subnet conflict avoidance</Title>
+	<Body>Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a virtual subnet.</Body>
 </Note>
 <Note>
-	<Title type="feature" docs="https://telepresence.io/docs/reference/vpn">Virtual Address Translation (VNAT).</Title>
-	<Body>-> It is now possible to use a virtual subnet without routing the affected IPs to a specific workload. A new `telepresence connect --vnat CIDR` flag was added that will perform virtual network address translation of cluster IPs. This flag is very similar to the `--proxy-via CIDR=WORKLOAD` introduced in 2.19, but without the need to specify a workload.</Body>
+	<Title type="feature" docs="reference/vpn">Virtual Address Translation (VNAT).</Title>
+	<Body>It is now possible to use a virtual subnet without routing the affected IPs to a specific workload. A new `telepresence connect --vnat CIDR` flag was added that will perform virtual network address translation of cluster IPs. This flag is very similar to the `--proxy-via CIDR=WORKLOAD` introduced in 2.19, but without the need to specify a workload.</Body>
 </Note>
 <Note>
-	<Title type="feature" docs="https://telepresence.io/docs/reference/intercepts/container">Intercepts targeting a specific container</Title>
-	<Body>-> In certain scenarios, the container owning the intercepted port differs from the container the intercept targets. This port owner's sole purpose is to route traffic from the service to the intended container, often using a direct localhost connection.
+	<Title type="feature" docs="reference/intercepts/container">Intercepts targeting a specific container</Title>
+	<Body>In certain scenarios, the container owning the intercepted port differs from the container the intercept targets. This port owner's sole purpose is to route traffic from the service to the intended container, often using a direct localhost connection.
 This update introduces a `--container <name>` option to the intercept command. While this option doesn't influence the port selection, it guarantees that the environment variables and mounts propagated to the client originate from the specified container. Additionally, if the `--replace` option is used, it ensures that this container is replaced.</Body>
 </Note>
 <Note>
-	<Title type="feature">New telepresence ingest command</Title>
+	<Title type="feature" docs="howtos/intercepts#ingest-your-service">New telepresence ingest command</Title>
 	<Body>The new `telepresence ingest` command, similar to `telepresence intercept`, provides local access to the volume mounts and environment variables of a targeted container. However, unlike `telepresence intercept`, `telepresence ingest` does not redirect traffic to the container and ensures that the mounted volumes are read-only.
 An ingest requires a traffic-agent to be installed in the pods of the targeted workload. Beyond that, it's a client-side operation. This allows developers to have multiple simultaneous ingests on the same container.</Body>
 </Note>
 <Note>
-	<Title type="feature">New telepresence curl command</Title>
+	<Title type="feature" docs="reference/docker-run#the-telepresence-curl-command">New telepresence curl command</Title>
 	<Body>The new `telepresence curl` command runs curl from within a container. The command requires that a connection has been established using `telepresence connect --docker`, and the container that runs `curl` will share the same network as the containerized telepresence daemon.</Body>
 </Note>
 <Note>
-	<Title type="feature">New telepresence docker-run command</Title>
+	<Title type="feature" docs="reference/docker-run#the-telepresence-docker-run-command">New telepresence docker-run command</Title>
 	<Body>The new `telepresence docker-run <flags and arguments>` requires that a connection has been established using `telepresence connect --docker` It will perform a `docker run <flags and arguments>` and add the flag necessary to ensure that started container shares the same network as the containerized telepresence daemon.</Body>
 </Note>
 <Note>
@@ -39,7 +39,7 @@ An ingest requires a traffic-agent to be installed in the pods of the targeted w
 	<Body>It is now possible to append ":ro" to the intercept `--mount` flag value. This ensures that all remote volumes that the intercept mounts are read-only.</Body>
 </Note>
 <Note>
-	<Title type="feature" docs="https://telepresence.io/docs/reference/config">Unify client configuration</Title>
+	<Title type="feature" docs="reference/config">Unify client configuration</Title>
 	<Body>Previously, client configuration was divided between the config.yml file and a Kubernetes extension. DNS and routing settings were initially found only in the extension. However, the Helm client structure allowed entries from both.
 To simplify this, we've now aligned the config.yml and Kubernetes extension with the Helm client structure. This means DNS and routing settings are now included in both. The Kubernetes extension takes precedence over the config.yml and Helm client object.
 While the old-style Kubernetes extension is still supported for compatibility, it cannot be used with the new style.</Body>
@@ -54,7 +54,7 @@ See [Streaming Transitions from SPDY to WebSockets](https://kubernetes.io/blog/2
 	<Body>The OSS code-base will no longer report usage data to the proprietary collector at Ambassador Labs. The actual calls to the collector remain, but will be no-ops unless a proper collector client is installed using an extension point.</Body>
 </Note>
 <Note>
-	<Title type="feature">Add deployments, statefulSets, replicaSets to workloads Helm chart value</Title>
+	<Title type="feature" docs="reference/intecepts/sidecar#disable-workloads">Add deployments, statefulSets, replicaSets to workloads Helm chart value</Title>
 	<Body>The Helm chart value `workloads` now supports the kinds `deployments.enabled`, `statefulSets.enabled`, `replicaSets.enabled`. and `rollouts.enabled`. All except `rollouts` are enabled by default. The traffic-manager will ignore workloads, and Telepresence will not be able to intercept them, if the `enabled` of the corresponding kind is set to `false`.</Body>
 </Note>
 <Note>
@@ -62,19 +62,19 @@ See [Streaming Transitions from SPDY to WebSockets](https://kubernetes.io/blog/2
 	<Body>The auto-completion of namespaces, services, and containers have been added where appropriate, and the default file auto completion has been removed from most commands.</Body>
 </Note>
 <Note>
-	<Title type="">Docker run flags --publish, --expose, and --network now work with docker mode connections</Title>
+	<Title type="feature" docs="reference/docker-run#the-telepresence-docker-run-command">Docker run flags --publish, --expose, and --network now work with docker mode connections</Title>
 	<Body>After establishing a connection to a cluster using `telepresence connect --docker`, you can run new containers that share the same network as the containerized daemon that maintains the connection. This enables seamless communication between your local development environment and the remote services.
 Normally, Docker has a limitation that prevents combining a shared network configuration with custom networks and exposing ports. However, Telepresence now elegantly circumvents this limitation so that a container started with `telepresence docker-run`, `telepresence intercept --docker-run`, or `telepresence ingest --docker-run` can use flags like `--network`, `--publish`, or `--expose`.
 To achieve this, Telepresence temporarily adds the necessary network to the containerized daemon. This allows the new container to join the same network. Additionally, Telepresence starts extra socat containers to handle port mapping, ensuring that the desired ports are exposed to the local environment.</Body>
 </Note>
 <Note>
-	<Title type="feature" docs="https://telepresence.io/docs/howtos/cluster-in-vm">Prevent recursion in the Telepresence Virtual Network Interface (VIF)</Title>
+	<Title type="feature" docs="howtos/cluster-in-vm">Prevent recursion in the Telepresence Virtual Network Interface (VIF)</Title>
 	<Body>Network problems may arise when running Kubernetes locally (e.g., Docker Desktop, Kind, Minikube, k3s), because the VIF on the host is also accessible from the cluster's nodes. A request that isn't handled by a cluster resource might be routed back into the VIF and cause a recursion.
 These recursions can now be prevented by setting the client configuration property `routing.recursionBlockDuration` so that new connection attempts are temporarily blocked for a specific IP:PORT pair immediately after an initial attempt, thereby effectively ending the recursion.</Body>
 </Note>
 <Note>
 	<Title type="feature">Allow Helm chart to be included as a sub-chart</Title>
-	<Body>The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart called anything but "traffic-manager".  This restriction has been lifted.</Body>
+	<Body>The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart called anything but "traffic-manager". This restriction has been lifted.</Body>
 </Note>
 <Note>
 	<Title type="change">During an intercept, the local port defaults to the targeted port of the intercepted container instead of 8080.</Title>

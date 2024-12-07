@@ -38,14 +38,14 @@ items:
     notes:
       - type: feature
         title: Automatic subnet conflict avoidance
-        body: ->
+        body: >-
           Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it
           will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a
           virtual subnet.
         docs: reference/vpn
       - type: feature
         title: Virtual Address Translation (VNAT).
-        body: ->
+        body: >-
           It is now possible to use a virtual subnet without routing the affected IPs to a specific workload. A new
           `telepresence connect --vnat CIDR` flag was added that will perform virtual network address translation of
           cluster IPs. This flag is very similar to the `--proxy-via CIDR=WORKLOAD` introduced in 2.19, but without
@@ -53,7 +53,7 @@ items:
         docs: reference/vpn
       - type: feature
         title: Intercepts targeting a specific container
-        body: ->
+        body: >-
           In certain scenarios, the container owning the intercepted port differs
           from the container the intercept targets. This port owner's sole purpose
           is to route traffic from the service to the intended container, often
@@ -75,18 +75,21 @@ items:
           
           An ingest requires a traffic-agent to be installed in the pods of the targeted workload. Beyond that, it's
           a client-side operation. This allows developers to have multiple simultaneous ingests on the same container.
+        docs: howtos/intercepts#ingest-your-service
       - type: feature
         title: New telepresence curl command
         body: >-
           The new `telepresence curl` command runs curl from within a container. The command requires that a connection
           has been established using `telepresence connect --docker`, and the container that runs `curl` will share the
           same network as the containerized telepresence daemon.
+        docs: reference/docker-run#the-telepresence-curl-command
       - type: feature
         title: New telepresence docker-run command
         body: >-
           The new `telepresence docker-run <flags and arguments>` requires that a connection has been established using
           `telepresence connect --docker` It will perform a `docker run <flags and arguments>` and add the flag necessary
           to ensure that started container shares the same network as the containerized telepresence daemon.
+        docs: reference/docker-run#the-telepresence-docker-run-command
       - type: feature
         title: Mount everything read-only during intercept
         body: >-
@@ -126,6 +129,7 @@ items:
           The Helm chart value `workloads` now supports the kinds `deployments.enabled`, `statefulSets.enabled`, `replicaSets.enabled`.
           and `rollouts.enabled`. All except `rollouts` are enabled by default. The traffic-manager will ignore workloads, and
           Telepresence will not be able to intercept them, if the `enabled` of the corresponding kind is set to `false`.
+        docs: reference/intecepts/sidecar#disable-workloads
       - type: feature
         title: Improved command auto-completion
         body: >-
@@ -146,6 +150,7 @@ items:
           To achieve this, Telepresence temporarily adds the necessary network to the containerized daemon. This allows the new
           container to join the same network. Additionally, Telepresence starts extra socat containers to handle port mapping,
           ensuring that the desired ports are exposed to the local environment.
+        docs: reference/docker-run#the-telepresence-docker-run-command
       - type: feature
         title: Prevent recursion in the Telepresence Virtual Network Interface (VIF)
         body: >-
@@ -162,7 +167,7 @@ items:
         body: >-
           The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally
           called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart
-          called anything but "traffic-manager".  This restriction has been lifted.
+          called anything but "traffic-manager". This restriction has been lifted.
       - type: change
         title: During an intercept, the local port defaults to the targeted port of the intercepted container instead of 8080.
         body: >-
