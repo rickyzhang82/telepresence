@@ -4,6 +4,9 @@ hide_table_of_contents: true
 ---
 # Volume mounts
 
+Volume mounts are achieved using a Docker Volume plug-in and Docker volume mounts when connecting using `--docker` and using `--docker-run`. This page
+describes how mounts are achieved when running directly on the host.
+
 Telepresence supports locally mounting of volumes that are mounted to your Pods.  You can specify a command to run when starting the intercept, this could be a subshell or local server such as Python or Node.
 
 ```

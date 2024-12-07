@@ -6,8 +6,8 @@ hide_table_of_contents: true
 
 # Environment variables
 
-Telepresence can import environment variables from the cluster pod when running an intercept.
-You can then use these variables with the code running on your laptop of the service being intercepted.
+Telepresence will import environment variables from the cluster container when running an ingest or intercept.
+You can use these variables with the code running on your laptop.
 
 There are several options available to do this:
 
@@ -17,7 +17,7 @@ There are several options available to do this:
    will allow control over the syntax of the file. Valid syntaxes are "docker", "compose", "sh", "csh", "cmd", and "ps" where "sh", "csh",
    and "ps" can be suffixed with ":export".
 
-2. `telepresence intercept [service] --port [port] --env-json=[FILENAME]`
+2. `telepresence intercept [service] --port [port] --env-file=[FILENAME] --env-syntax=json`
 
    This will write the environment variables to a JSON file. This file can be injected into other build processes.
 

@@ -22,7 +22,7 @@ Let's illustrate with a quick demo, assuming a default Kubernetes context named 
 
 ```cli
 $ telepresence connect --docker
-Connected to context default (https://default.cluster.bakerstreet.io)
+Connected to context default, namespace default (https://default.cluster.bakerstreet.io)
 
 $ docker ps
 CONTAINER ID   IMAGE                          COMMAND                  CREATED          STATUS          PORTS                        NAMES

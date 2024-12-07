@@ -5,12 +5,13 @@ title: Telepresence and VPNs
 # Telepresence and VPNs
 
 Telepresence creates a virtual network interface (VIF) when it connects. This VIF is configured to route the cluster's 
-service subnet and pod subnets so that the user can access resources in the cluster. It's not uncommon that the
-workstation where Telepresence runs already has network interfaces that route subnets that will overlap. Such
+service and pod subnets so that the user can access resources in the cluster. It's not uncommon that the workstation
+where Telepresence runs already has network interfaces that route subnets that will overlap. Such
 conflicts must be resolved deterministically.
 
-Unless configured otherwise, Telepresence will resolve subnet conflicts by simply moving the cluster's subnet using
-network address translation. For a majority of use-cases, this will be enough.
+Unless configured otherwise, Telepresence will resolve subnet conflicts by moving the cluster's subnet out of the way
+using network address translation. For a majority of use-cases, this will be enough, but there are some
+[caveats](#caveats-when-using-vnat) to be aware of.
 
 For more info, see the section on how to [avoid the conflict](#avoiding-the-conflict) below.
 
