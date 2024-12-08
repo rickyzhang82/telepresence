@@ -4,8 +4,6 @@ import (
 	"reflect"
 
 	"github.com/go-json-experiment/json"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/yaml"
@@ -181,9 +179,6 @@ type Sidecar struct {
 	// The port used by the agents restFUL API server
 	APIPort uint16 `json:"apiPort,omitzero"`
 
-	// The port used by the agent's GRPC tracing server
-	TracingPort uint16 `json:"tracingPort,omitzero"`
-
 	// Resources for the sidecar
 	Resources *core.ResourceRequirements `json:"resources,omitempty"`
 
@@ -212,8 +207,6 @@ type SidecarExt interface {
 	AgentConfig() *Sidecar
 
 	Marshal() ([]byte, error)
-
-	RecordInSpan(span trace.Span)
 }
 
 // SidecarType is Sidecar by default but can be any type implementing SidecarExt.
@@ -226,17 +219,4 @@ func UnmarshalYAML(data []byte) (SidecarExt, error) {
 		return nil, err
 	}
 	return into.(SidecarExt), nil
-}
-
-func (s *Sidecar) RecordInSpan(span trace.Span) {
-	bytes, err := yaml.Marshal(s)
-	if err != nil {
-		span.AddEvent("tel2.agent-sidecar-marshal-fail", trace.WithAttributes(
-			attribute.String("tel2.agent-name", s.AgentName),
-		))
-		return
-	}
-	span.SetAttributes(
-		attribute.String("tel2.agent-sidecar", string(bytes)),
-	)
 }

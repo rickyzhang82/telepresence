@@ -83,7 +83,6 @@ type Session interface {
 	ForeachAgentPod(ctx context.Context, fn func(context.Context, typed.PodInterface, *core.Pod), filter func(*core.Pod) bool) error
 
 	GatherLogs(context.Context, *connector.LogsRequest) (*connector.LogsResponse, error)
-	GatherTraces(ctx context.Context, tr *connector.TracesRequest) *common.Result
 
 	SessionInfo() *manager.SessionInfo
 	RootDaemon() rootdRpc.DaemonClient

@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/datawire/dlib/dlog"
 	"github.com/telepresenceio/telepresence/v2/pkg/agentconfig"
 	"github.com/telepresenceio/telepresence/v2/pkg/dos"
@@ -84,18 +82,6 @@ func (c *config) PodName() string {
 
 func (c *config) PodIP() string {
 	return c.podIP
-}
-
-func OtelResources(ctx context.Context, c Config) []attribute.KeyValue {
-	return []attribute.KeyValue{
-		attribute.Bool("tel2.has-mounts", c.HasMounts(ctx)),
-		attribute.String("tel2.workload-name", c.AgentConfig().WorkloadName),
-		attribute.String("tel2.workload-kind", c.AgentConfig().WorkloadKind),
-		attribute.String("tel2.manager-host", fmt.Sprintf("%s:%v", c.AgentConfig().ManagerHost, c.AgentConfig().ManagerPort)),
-		attribute.Bool("tel2.manual", c.AgentConfig().Manual),
-		attribute.String("k8s.namespace", c.AgentConfig().Namespace),
-		attribute.String("k8s.pod-ip", c.PodIP()),
-	}
 }
 
 // addAppMounts adds each of the mounts present under the containers MountPoint as a

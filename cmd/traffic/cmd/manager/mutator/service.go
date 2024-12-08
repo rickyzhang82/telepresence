@@ -17,7 +17,6 @@ import (
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	jsonv1 "github.com/go-json-experiment/json/v1"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	admission "k8s.io/api/admission/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,9 +155,6 @@ func ServeMutator(ctx context.Context, injectorCertGetter InjectorCertGetter) er
 		w.WriteHeader(http.StatusOK)
 	})
 
-	wrapped := otelhttp.NewHandler(mux, "agent-injector", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-		return operation + r.URL.Path
-	}))
 	port := managerutil.GetEnv(ctx).MutatorWebhookPort
 	lg := dlog.StdLogger(ctx, dlog.MaxLogLevel(ctx))
 	lg.SetPrefix(fmt.Sprintf("%d/", port))
@@ -170,7 +166,7 @@ func ServeMutator(ctx context.Context, injectorCertGetter InjectorCertGetter) er
 		wr: lg.Writer(),
 	})
 	server := http.Server{
-		Handler:  wrapped,
+		Handler:  mux,
 		ErrorLog: lg,
 		BaseContext: func(n net.Listener) context.Context {
 			return ctx

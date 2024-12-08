@@ -45,7 +45,6 @@ const (
 	Connector_SetLogLevel_FullMethodName             = "/telepresence.connector.Connector/SetLogLevel"
 	Connector_Quit_FullMethodName                    = "/telepresence.connector.Connector/Quit"
 	Connector_GatherLogs_FullMethodName              = "/telepresence.connector.Connector/GatherLogs"
-	Connector_GatherTraces_FullMethodName            = "/telepresence.connector.Connector/GatherTraces"
 	Connector_AddInterceptor_FullMethodName          = "/telepresence.connector.Connector/AddInterceptor"
 	Connector_RemoveInterceptor_FullMethodName       = "/telepresence.connector.Connector/RemoveInterceptor"
 	Connector_GetNamespaces_FullMethodName           = "/telepresence.connector.Connector/GetNamespaces"
@@ -118,9 +117,6 @@ type ConnectorClient interface {
 	// GatherLogs will acquire logs for the various Telepresence components in kubernetes
 	// (pending the request) and return them to the caller
 	GatherLogs(ctx context.Context, in *LogsRequest, opts ...grpc.CallOption) (*LogsResponse, error)
-	// GatherTraces will acquire traces for the various Telepresence components in kubernetes
-	// (pending the request) and save them in a file.
-	GatherTraces(ctx context.Context, in *TracesRequest, opts ...grpc.CallOption) (*common.Result, error)
 	// AddInterceptor tells the connector that a given process is serving a specific
 	// intercept. The connector must kill this process when the intercept ends
 	AddInterceptor(ctx context.Context, in *Interceptor, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -394,16 +390,6 @@ func (c *connectorClient) GatherLogs(ctx context.Context, in *LogsRequest, opts 
 	return out, nil
 }
 
-func (c *connectorClient) GatherTraces(ctx context.Context, in *TracesRequest, opts ...grpc.CallOption) (*common.Result, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(common.Result)
-	err := c.cc.Invoke(ctx, Connector_GatherTraces_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *connectorClient) AddInterceptor(ctx context.Context, in *Interceptor, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -555,9 +541,6 @@ type ConnectorServer interface {
 	// GatherLogs will acquire logs for the various Telepresence components in kubernetes
 	// (pending the request) and return them to the caller
 	GatherLogs(context.Context, *LogsRequest) (*LogsResponse, error)
-	// GatherTraces will acquire traces for the various Telepresence components in kubernetes
-	// (pending the request) and save them in a file.
-	GatherTraces(context.Context, *TracesRequest) (*common.Result, error)
 	// AddInterceptor tells the connector that a given process is serving a specific
 	// intercept. The connector must kill this process when the intercept ends
 	AddInterceptor(context.Context, *Interceptor) (*emptypb.Empty, error)
@@ -650,9 +633,6 @@ func (UnimplementedConnectorServer) Quit(context.Context, *emptypb.Empty) (*empt
 }
 func (UnimplementedConnectorServer) GatherLogs(context.Context, *LogsRequest) (*LogsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GatherLogs not implemented")
-}
-func (UnimplementedConnectorServer) GatherTraces(context.Context, *TracesRequest) (*common.Result, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GatherTraces not implemented")
 }
 func (UnimplementedConnectorServer) AddInterceptor(context.Context, *Interceptor) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddInterceptor not implemented")
@@ -1093,24 +1073,6 @@ func _Connector_GatherLogs_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Connector_GatherTraces_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TracesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ConnectorServer).GatherTraces(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Connector_GatherTraces_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConnectorServer).GatherTraces(ctx, req.(*TracesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Connector_AddInterceptor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Interceptor)
 	if err := dec(in); err != nil {
@@ -1363,10 +1325,6 @@ var Connector_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GatherLogs",
 			Handler:    _Connector_GatherLogs_Handler,
-		},
-		{
-			MethodName: "GatherTraces",
-			Handler:    _Connector_GatherTraces_Handler,
 		},
 		{
 			MethodName: "AddInterceptor",

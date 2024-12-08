@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"net"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/telepresenceio/telepresence/v2/pkg/ipproto"
 	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
 )
@@ -185,10 +182,6 @@ func (id ConnID) DestinationNetwork() string {
 		return "ip4"
 	}
 	return "ip6"
-}
-
-func (id ConnID) SpanRecord(span trace.Span) {
-	span.SetAttributes(attribute.String("tel2.conn-id", id.String()))
 }
 
 // Reply returns a copy of this ConnID with swapped source and destination properties.

@@ -43,8 +43,7 @@ type Env struct {
 	APIPort             uint16        `env:"AGENT_REST_API_PORT,      parser=port-number, default=0"`
 	AgentArrivalTimeout time.Duration `env:"AGENT_ARRIVAL_TIMEOUT,    parser=time.ParseDuration, default=0"`
 
-	TracingGrpcPort uint16            `env:"TRACING_GRPC_PORT,     parser=port-number,default=0"`
-	MaxReceiveSize  resource.Quantity `env:"GRPC_MAX_RECEIVE_SIZE, parser=quantity"`
+	MaxReceiveSize resource.Quantity `env:"GRPC_MAX_RECEIVE_SIZE, parser=quantity"`
 
 	PodCIDRStrategy string         `env:"POD_CIDR_STRATEGY, parser=nonempty-string"`
 	PodCIDRs        []netip.Prefix `env:"POD_CIDRS,         parser=split-ipnet, default="`
@@ -82,7 +81,6 @@ func (e *Env) GeneratorConfig(qualifiedAgentImage string) (agentmap.GeneratorCon
 	return &agentmap.BasicGeneratorConfig{
 		AgentPort:           e.AgentPort,
 		APIPort:             e.APIPort,
-		TracingPort:         e.TracingGrpcPort,
 		ManagerPort:         e.ServerPort,
 		QualifiedAgentImage: qualifiedAgentImage,
 		ManagerNamespace:    e.ManagerNamespace,

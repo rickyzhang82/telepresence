@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/pkg/sftp"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	"github.com/datawire/dlib/dgroup"
@@ -26,7 +25,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/forwarder"
 	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
 	"github.com/telepresenceio/telepresence/v2/pkg/restapi"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 	"github.com/telepresenceio/telepresence/v2/pkg/tunnel"
 	"github.com/telepresenceio/telepresence/v2/pkg/version"
 )
@@ -224,24 +222,6 @@ func TalkToManagerLoop(ctx context.Context, s State, info *rpc.AgentInfo) {
 func StartServices(ctx context.Context, g *dgroup.Group, config Config, srv State) (*rpc.AgentInfo, error) {
 	var grpcOpts []grpc.ServerOption
 	ac := config.AgentConfig()
-	if ac.TracingPort != 0 {
-		g.Go("tracer-grpc", func(c context.Context) error {
-			tracer, err := tracing.NewTraceServer(c, "traffic-agent", OtelResources(c, config)...)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				c, cancel := context.WithTimeout(context.WithoutCancel(c), time.Second)
-				tracer.Shutdown(c)
-				cancel()
-			}()
-			return tracer.ServeGrpc(c, ac.TracingPort)
-		})
-
-		grpcOpts = []grpc.ServerOption{
-			grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		}
-	}
 
 	grpcPortCh := make(chan uint16)
 	g.Go("tunneling", func(ctx context.Context) error {

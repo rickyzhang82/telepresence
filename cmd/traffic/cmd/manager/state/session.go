@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/puzpuzpuz/xsync/v3"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -59,10 +57,6 @@ func (ss *sessionState) EstablishBidiPipe(ctx context.Context, stream tunnel.Str
 		RoundtripLatency: int64(stream.RoundtripLatency()),
 		DialTimeout:      int64(stream.DialTimeout()),
 	}
-	propagator := otel.GetTextMapPropagator()
-	carrier := propagation.MapCarrier{}
-	propagator.Inject(ctx, carrier)
-	dr.TraceContext = carrier
 	select {
 	case <-ss.Done():
 		return nil, status.Error(codes.Canceled, "session cancelled")

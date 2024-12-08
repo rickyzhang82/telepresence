@@ -107,6 +107,19 @@ Telepresence mimics the environment of a target container during an intercept, s
 A default can still be explicitly defined using the `config.intercept.defaultPort` setting.
 </div>
 
+## <div style="display:flex;"><img src="images/change.png" alt="change" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Tracing was removed.</div></div>
+<div style="margin-left: 15px">
+
+The ability to collect trace has been removed along with the `telepresence gather-traces` and  `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
+</div>
+
+## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Cap timeouts.connectivityCheck at 5 seconds.</div></div>
+<div style="margin-left: 15px">
+
+The timeout value of `timeouts.connectivityCheck` is used when checking if a cluster is already reachable without Telepresence setting up an additional network route. If it is, this timeout should be high enough to cover the delay when establishing a connection. If this delay is higher than a second, then chances are very low that the cluster already is reachable, and if it can, that all accesses to it will be very slow. In such cases, Telepresence will create its own network interface and do perform its own tunneling.
+The default timeout for the check remains at 500 millisecond, which is more than sufficient for the majority of cases.
+</div>
+
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Prevent that traffic-manager injects a traffic-agent into itself.</div></div>
 <div style="margin-left: 15px">
 

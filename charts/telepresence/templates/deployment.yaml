@@ -63,12 +63,6 @@ spec:
             value: {{ .agentInjector.secret.name }}
           {{- end }}
           {{- end }}
-          {{- with .tracing }}
-          {{- if .grpcPort }}
-          - name: TRACING_GRPC_PORT
-            value: {{ .grpcPort | quote }}
-          {{- end }}
-          {{- end }}
           {{- with .telepresenceAPI }}
           {{- if .port }}
           - name: AGENT_REST_API_PORT
@@ -276,10 +270,6 @@ spec:
           {{- if .prometheus.port }}  # 0 is false
           - name: prometheus
             containerPort: {{ .prometheus.port }}
-          {{- end }}
-          {{- with .tracing }}
-          - name: grpc-trace
-            containerPort: {{ .grpcPort }}
           {{- end }}
           {{- with .livenessProbe }}
           livenessProbe:

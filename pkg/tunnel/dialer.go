@@ -10,10 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/propagation"
-
 	"github.com/datawire/dlib/dlog"
 	rpc "github.com/telepresenceio/telepresence/rpc/v2/manager"
 	"github.com/telepresenceio/telepresence/v2/pkg/ipproto"
@@ -109,12 +105,9 @@ func NewConnEndpointTTL(
 
 func (h *dialer) Start(ctx context.Context) {
 	go func() {
-		ctx, span := otel.Tracer("").Start(ctx, "dialer")
-		defer span.End()
 		defer close(h.done)
 
 		id := h.stream.ID()
-		id.SpanRecord(span)
 
 		switch h.connected {
 		case notConnected:
@@ -126,7 +119,6 @@ func (h *dialer) Start(ctx context.Context) {
 			conn, err := d.DialContext(ctx, id.DestinationProtocolString(), id.DestinationAddr().String())
 			if err != nil {
 				dlog.Errorf(ctx, "!! CONN %s, failed to establish connection: %v", id, err)
-				span.SetStatus(codes.Error, err.Error())
 				if err = h.stream.Send(ctx, NewMessage(DialReject, nil)); err != nil {
 					dlog.Errorf(ctx, "!! CONN %s, failed to send DialReject: %v", id, err)
 				}
@@ -139,7 +131,6 @@ func (h *dialer) Start(ctx context.Context) {
 			if err = h.stream.Send(ctx, NewMessage(DialOK, nil)); err != nil {
 				_ = conn.Close()
 				dlog.Errorf(ctx, "!! CONN %s, failed to send DialOK: %v", id, err)
-				span.SetStatus(codes.Error, err.Error())
 				return
 			}
 			dlog.Tracef(ctx, "   CONN %s, dial answered", id)
@@ -355,15 +346,7 @@ func DialWaitLoop(
 }
 
 func dialRespond(ctx context.Context, tunnelProvider Provider, dr *rpc.DialRequest, sessionID string) {
-	if tc := dr.GetTraceContext(); tc != nil {
-		carrier := propagation.MapCarrier(tc)
-		propagator := otel.GetTextMapPropagator()
-		ctx = propagator.Extract(ctx, carrier)
-	}
-	ctx, span := otel.Tracer("").Start(ctx, "dialRespond")
-	defer span.End()
 	id := ConnID(dr.ConnId)
-	id.SpanRecord(span)
 	mt, err := tunnelProvider.Tunnel(ctx)
 	if err != nil {
 		dlog.Errorf(ctx, "!! CONN %s, call to manager Tunnel failed: %v", id, err)

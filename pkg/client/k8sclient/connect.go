@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	empty "google.golang.org/protobuf/types/known/emptypb"
@@ -60,8 +59,7 @@ func ConnectToAgent(
 func dialClusterGRPC(ctx context.Context, address string) (*grpc.ClientConn, error) {
 	return grpc.NewClient(portforward.K8sPFScheme+":///"+address, grpc.WithContextDialer(portforward.Dialer(ctx)),
 		grpc.WithResolvers(portforward.NewResolver(ctx)),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
 func getVersion(ctx context.Context, gc versionAPI) (*manager.VersionInfo2, error) {

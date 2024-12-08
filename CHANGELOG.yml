@@ -175,6 +175,12 @@ items:
           for the local port is determined by the targeted container port rather than just defaulting to 8080.
           
           A default can still be explicitly defined using the `config.intercept.defaultPort` setting.
+      - type: change
+        title: Tracing was removed.
+        body: >-
+          The ability to collect trace has been removed along with the `telepresence gather-traces` and 
+          `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since
+          its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
       - type: bugfix
         title: Cap timeouts.connectivityCheck at 5 seconds.
         body: >-

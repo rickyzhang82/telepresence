@@ -11,7 +11,6 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/google/uuid"
 	dns2 "github.com/miekg/dns"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/exp/maps"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -31,7 +30,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/cmd/traffic/cmd/manager/state"
 	"github.com/telepresenceio/telepresence/v2/pkg/dnsproxy"
 	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 	"github.com/telepresenceio/telepresence/v2/pkg/tunnel"
 	"github.com/telepresenceio/telepresence/v2/pkg/version"
 	"github.com/telepresenceio/telepresence/v2/pkg/workload"
@@ -555,8 +553,6 @@ func (s *service) PrepareIntercept(ctx context.Context, request *rpc.CreateInter
 	}()
 	ctx = managerutil.WithSessionInfo(ctx, request.Session)
 	dlog.Debugf(ctx, "PrepareIntercept %s called", request.InterceptSpec.Name)
-	span := trace.SpanFromContext(ctx)
-	tracing.RecordInterceptSpec(span, request.InterceptSpec)
 	return s.state.PrepareIntercept(ctx, request)
 }
 
@@ -608,8 +604,6 @@ func (s *service) CreateIntercept(ctx context.Context, ciReq *rpc.CreateIntercep
 	sessionID := ciReq.GetSession().GetSessionId()
 	spec := ciReq.InterceptSpec
 	dlog.Debugf(ctx, "CreateIntercept %s called", ciReq.InterceptSpec.Name)
-	span := trace.SpanFromContext(ctx)
-	tracing.RecordInterceptSpec(span, spec)
 
 	if val := validateIntercept(spec); val != "" {
 		return nil, status.Error(codes.InvalidArgument, val)
@@ -625,9 +619,6 @@ func (s *service) CreateIntercept(ctx context.Context, ciReq *rpc.CreateIntercep
 	client, interceptInfo, err := s.state.AddIntercept(ctx, sessionID, s.clusterInfo.ID(), ciReq)
 	if err != nil {
 		return nil, err
-	}
-	if interceptInfo != nil {
-		tracing.RecordInterceptInfo(span, interceptInfo)
 	}
 
 	if ciReq.InterceptSpec.Replace {

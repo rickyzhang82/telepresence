@@ -378,7 +378,6 @@ managerHost: traffic-manager.ambassador
 managerPort: 8081
 namespace: default
 pullPolicy: IfNotPresent
-tracingPort: 15766
 workloadKind: Deployment
 workloadName: hello
 
