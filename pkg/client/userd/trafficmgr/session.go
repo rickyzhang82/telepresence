@@ -1037,9 +1037,10 @@ func (s *session) connectRootDaemon(ctx context.Context, nc *rootdRpc.NetworkCon
 		}()
 		rd = rootdRpc.NewDaemonClient(conn)
 
+		tmTimeout := client.GetConfig(ctx).Timeouts().Get(client.TimeoutTrafficManagerConnect)
 		for attempt := 1; ; attempt++ {
 			var rootStatus *rootdRpc.DaemonStatus
-			tCtx, tCancel := context.WithTimeout(ctx, 15*time.Second)
+			tCtx, tCancel := context.WithTimeout(ctx, tmTimeout/2)
 			rootStatus, err = rd.Connect(tCtx, nc)
 			tCancel()
 			if err != nil {
