@@ -9,8 +9,8 @@ import { Note, Title, Body } from '@site/src/components/ReleaseNotes'
 # Telepresence Release Notes
 ## Version 2.21.0
 <Note>
-	<Title type="feature" docs="reference/vpn">Automatic subnet conflict avoidance</Title>
-	<Body>Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a virtual subnet.</Body>
+	<Title type="feature" docs="reference/vpn">Automatic VPN conflict avoidance</Title>
+	<Body>Telepresence not only detects subnet conflicts between the cluster and workstation VPNs but also resolves them by performing network address translation to move conflicting subnets out of the way.</Body>
 </Note>
 <Note>
 	<Title type="feature" docs="reference/vpn">Virtual Address Translation (VNAT).</Title>

@@ -37,11 +37,10 @@ items:
     date: TBD
     notes:
       - type: feature
-        title: Automatic subnet conflict avoidance
+        title: Automatic VPN conflict avoidance
         body: >-
-          Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it
-          will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a
-          virtual subnet.
+          Telepresence not only detects subnet conflicts between the cluster and workstation VPNs but also resolves them
+          by performing network address translation to move conflicting subnets out of the way.
         docs: reference/vpn
       - type: feature
         title: Virtual Address Translation (VNAT).
