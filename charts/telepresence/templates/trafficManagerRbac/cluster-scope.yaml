@@ -66,7 +66,6 @@ rules:
 {{- end }}
   resourceNames:
   - telepresence-agents
-  - telepresence-intercept-env
 - apiGroups:
   - "apps"
   resources:

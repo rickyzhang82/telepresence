@@ -82,6 +82,10 @@ These recursions can now be prevented by setting the client configuration proper
 A default can still be explicitly defined using the `config.intercept.defaultPort` setting.</Body>
 </Note>
 <Note>
+	<Title type="change">Move the telepresence-intercept-env configmap data into traffic-manager configmap.</Title>
+	<Body>There's no need for two configmaps that store configuration data for the traffic manager. The traffic-manager configmap is also watched, so consolidating the configuration there saves some k8s API calls.</Body>
+</Note>
+<Note>
 	<Title type="change">Tracing was removed.</Title>
 	<Body>The ability to collect trace has been removed along with the `telepresence gather-traces` and  `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.</Body>
 </Note>

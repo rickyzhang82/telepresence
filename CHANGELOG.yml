@@ -176,6 +176,11 @@ items:
           
           A default can still be explicitly defined using the `config.intercept.defaultPort` setting.
       - type: change
+        title: Move the telepresence-intercept-env configmap data into traffic-manager configmap.
+        body: >-
+          There's no need for two configmaps that store configuration data for the traffic manager. The traffic-manager
+          configmap is also watched, so consolidating the configuration there saves some k8s API calls.
+      - type: change
         title: Tracing was removed.
         body: >-
           The ability to collect trace has been removed along with the `telepresence gather-traces` and 

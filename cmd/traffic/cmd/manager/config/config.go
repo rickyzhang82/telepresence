@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-json-experiment/json"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/yaml"
 
 	"github.com/datawire/dlib/dlog"
 	"github.com/datawire/k8sapi/pkg/k8sapi"
@@ -17,8 +19,9 @@ import (
 )
 
 const (
-	clientConfigFileName = "client.yaml"
-	cfgConfigMapName     = "traffic-manager"
+	clientConfigFileName   = "client.yaml"
+	agentEnvConfigFileName = "agent-env.yaml"
+	cfgConfigMapName       = "traffic-manager"
 )
 
 type WatcherCallback func(watch.EventType, runtime.Object) error
@@ -26,6 +29,11 @@ type WatcherCallback func(watch.EventType, runtime.Object) error
 type Watcher interface {
 	Run(ctx context.Context) error
 	GetClientConfigYaml() []byte
+	GetAgentEnv() AgentEnv
+}
+
+type AgentEnv struct {
+	Excluded []string `json:"excluded,omitempty"`
 }
 
 type config struct {
@@ -33,6 +41,7 @@ type config struct {
 	namespace string
 
 	clientYAML []byte
+	agentEnv   AgentEnv
 }
 
 func NewWatcher(namespace string) Watcher {
@@ -106,7 +115,7 @@ func (c *config) refreshFile(ctx context.Context, data map[string]string) {
 		c.clientYAML = []byte(yml)
 		cfg, err := client.ParseConfigYAML(ctx, clientConfigFileName, c.clientYAML)
 		if err != nil {
-			dlog.Errorf(ctx, "failed to unmarshal YAML from %s", clientConfigFileName)
+			dlog.Errorf(ctx, "failed to unmarshal YAML from %s: %v", clientConfigFileName, err)
 		} else if AmendClientConfigFunc(ctx, cfg) {
 			c.clientYAML = []byte(cfg.String())
 			dlog.Debugf(ctx, "Refreshed client config: %s", yml)
@@ -115,7 +124,25 @@ func (c *config) refreshFile(ctx context.Context, data map[string]string) {
 		c.clientYAML = nil
 		dlog.Debugf(ctx, "Cleared client config")
 	}
+
+	c.agentEnv = AgentEnv{}
+	if yml, ok := data[agentEnvConfigFileName]; ok {
+		data, err := yaml.YAMLToJSON([]byte(yml))
+		if err == nil {
+			err = json.Unmarshal(data, &c.agentEnv)
+		}
+		if err != nil {
+			dlog.Errorf(ctx, "failed to unmarshal YAML from %s: %v", agentEnvConfigFileName, err)
+		}
+		dlog.Debugf(ctx, "Refreshed agent-env: %s", yml)
+	} else {
+		dlog.Debugf(ctx, "Cleared agent-env")
+	}
 	c.Unlock()
+}
+
+func (c *config) GetAgentEnv() AgentEnv {
+	return c.agentEnv
 }
 
 func (c *config) GetClientConfigYaml() (ret []byte) {

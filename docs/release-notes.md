@@ -107,6 +107,12 @@ Telepresence mimics the environment of a target container during an intercept, s
 A default can still be explicitly defined using the `config.intercept.defaultPort` setting.
 </div>
 
+## <div style="display:flex;"><img src="images/change.png" alt="change" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Move the telepresence-intercept-env configmap data into traffic-manager configmap.</div></div>
+<div style="margin-left: 15px">
+
+There's no need for two configmaps that store configuration data for the traffic manager. The traffic-manager configmap is also watched, so consolidating the configuration there saves some k8s API calls.
+</div>
+
 ## <div style="display:flex;"><img src="images/change.png" alt="change" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Tracing was removed.</div></div>
 <div style="margin-left: 15px">
 
