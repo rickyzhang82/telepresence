@@ -54,7 +54,7 @@ func (s *multiConnectSuite) SetupSuite() {
 	const svc = "echo"
 	appData := itest.AppData{
 		AppName: svc,
-		Image:   "jmalloc/echo-server:0.1.0",
+		Image:   "ghcr.io/telepresenceio/echo-server:latest",
 		Ports: []itest.AppPort{
 			{
 				ServicePortNumber: 80,

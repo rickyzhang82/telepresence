@@ -47,7 +47,7 @@ func (s *ingestSuite) SetupSuite() {
 		defer wg.Done()
 		itest.ApplyAppTemplate(ctx, s.AppNamespace(), &itest.AppData{
 			AppName: "echo-env",
-			Image:   "jmalloc/echo-server:0.1.0",
+			Image:   "ghcr.io/telepresenceio/echo-server:latest",
 			Ports: []itest.AppPort{
 				{
 					ServicePortNumber: 80,
@@ -68,7 +68,7 @@ func (s *ingestSuite) SetupSuite() {
 		defer wg.Done()
 		itest.ApplyAppTemplate(ctx, s.AppNamespace(), &itest.AppData{
 			AppName: "echo",
-			Image:   "jmalloc/echo-server:0.1.0",
+			Image:   "ghcr.io/telepresenceio/echo-server:latest",
 			Ports: []itest.AppPort{
 				{
 					ServicePortNumber: 80,
