@@ -212,6 +212,12 @@ items:
           
           If a user should require the pod-subnet to be mapped, it can be added to the `client.routing.alsoProxy`
           list in the helm chart.
+      - type: bugfix
+        title: Let routes belonging to an allowed conflict be added as a static route on Linux.
+        body: >-
+          The `allowConflicting` setting didn't always work on Linux because the conflicting subnet was just added as a
+          link to the TUN device, and therefore didn't get subjected to routing rule used to assign priority to the
+          given subnet.
   - version: 2.20.3
     date: 2024-11-18
     notes:

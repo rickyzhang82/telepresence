@@ -139,6 +139,12 @@ A user would normally never access pods in the `kube-system` namespace directly,
 If a user should require the pod-subnet to be mapped, it can be added to the `client.routing.alsoProxy` list in the helm chart.
 </div>
 
+## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Let routes belonging to an allowed conflict be added as a static route on Linux.</div></div>
+<div style="margin-left: 15px">
+
+The `allowConflicting` setting didn't always work on Linux because the conflicting subnet was just added as a link to the TUN device, and therefore didn't get subjected to routing rule used to assign priority to the given subnet.
+</div>
+
 ## Version 2.20.3 <span style="font-size: 16px;">(November 18)</span>
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">[Ensure that Telepresence works with GitHub Codespaces](https://github.com/telepresenceio/telepresence/issues/3722)</div></div>
 <div style="margin-left: 15px">

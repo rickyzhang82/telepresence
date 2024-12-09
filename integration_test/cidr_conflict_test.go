@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"fmt"
+	"net"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -145,4 +146,32 @@ func (s *cidrConflictSuite) Test_AutoConflictResolution_ClientDisable() {
 	})
 	_, err := s.TelepresenceTryConnect(ctx)
 	s.Require().Error(err)
+}
+
+func (s *cidrConflictSuite) Test_AllowConflictResolution() {
+	ctx := itest.WithConfig(s.Context(), func(cfg client.Config) {
+		cfg.Routing().AutoResolveConflicts = false
+		cfg.Routing().AllowConflicting = s.subnets
+	})
+
+	testIP := net.IP(s.subnets[0].Addr().AsSlice())
+	testIP[len(testIP)-1] = 37
+
+	// Verify that a route in the conflicting subnet is routed via brm
+	out, err := itest.Output(ctx, "ip", "route", "get", testIP.String())
+	rq := s.Require()
+	rq.NoError(err)
+	rq.Contains(out, "dev brm")
+
+	s.TelepresenceConnect(ctx)
+	defer itest.TelepresenceQuitOk(ctx)
+	st := itest.TelepresenceStatusOk(ctx)
+	defer itest.TelepresenceQuitOk(ctx)
+	sns := st.RootDaemon.Subnets
+	rq.Equal(sns, s.subnets, "Subnets should not change but %v != %v", sns, s.subnets)
+
+	// Verify that a route in the conflicting subnet is routed via Telepresence
+	out, err = itest.Output(ctx, "ip", "route", "get", testIP.String())
+	rq.NoError(err)
+	rq.Contains(out, "dev tel0") // tel0 is OK, we only run this on linux
 }
