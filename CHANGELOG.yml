@@ -168,6 +168,14 @@ items:
           called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart
           called anything but "traffic-manager". This restriction has been lifted.
       - type: change
+        title: The --agents flag to telepresence uninstall is now the default.
+        body: >-
+          The `telepresence uninstall` was once capable of uninstalling the traffic-manager as well as traffic-agents.
+          This behavior has been deprecated for some time now and in this release, the command is all about uninstalling
+          the agents. Therefore the `--agents` flag was made redundant and whatever arguments that are given to the
+          command must be name of workloads that have an agent installed unless the `--all-agents` is used, in which
+          case no arguments are allowed.
+      - type: change
         title: During an intercept, the local port defaults to the targeted port of the intercepted container instead of 8080.
         body: >-
           Telepresence mimics the environment of a target container during an intercept, so it's only natural that the default

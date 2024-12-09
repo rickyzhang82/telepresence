@@ -77,6 +77,10 @@ These recursions can now be prevented by setting the client configuration proper
 	<Body>The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart called anything but "traffic-manager". This restriction has been lifted.</Body>
 </Note>
 <Note>
+	<Title type="change">The --agents flag to telepresence uninstall is now the default.</Title>
+	<Body>The `telepresence uninstall` was once capable of uninstalling the traffic-manager as well as traffic-agents. This behavior has been deprecated for some time now and in this release, the command is all about uninstalling the agents. Therefore the `--agents` flag was made redundant and whatever arguments that are given to the command must be name of workloads that have an agent installed unless the `--all-agents` is used, in which case no arguments are allowed.</Body>
+</Note>
+<Note>
 	<Title type="change">During an intercept, the local port defaults to the targeted port of the intercepted container instead of 8080.</Title>
 	<Body>Telepresence mimics the environment of a target container during an intercept, so it's only natural that the default for the local port is determined by the targeted container port rather than just defaulting to 8080.
 A default can still be explicitly defined using the `config.intercept.defaultPort` setting.</Body>
