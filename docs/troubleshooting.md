@@ -101,8 +101,9 @@ spec:
       targetPort: http
 ```
 
-Telepresence's mutating webhook will refrain from injecting an init-container when the `targetPort` is a name.  Instead,
-it will do the following during the injection of the traffic-agent:
+Telepresence injects an init-container into the pods of a workload, only if at least one service specifies a numeric
+`tagertPort` that references a `containerPort` in the workload. When this isn't the case, it will instead do the
+following during the injection of the traffic-agent:
 
 1. Rename the designated container's port by prefixing it (i.e., containerPort: http becomes containerPort: tm-http).
 2. Let the container port of our injected traffic-agent use the original name (i.e., containerPort: http).
@@ -110,9 +111,9 @@ it will do the following during the injection of the traffic-agent:
 Kubernetes takes care of the rest and will now associate the service's `targetPort` with our traffic-agent's
 `containerPort`.
 
-### Important note
-If the service is "headless" (using `ClusterIP: None`), then using named ports won't help because the `targetPort` will
-not get remapped. A headless service will always require the init-container.
+> [!IMPORTANT]
+> If the service is "headless" (using `ClusterIP: None`), then using named ports won't help because the `targetPort` will
+> not get remapped. A headless service will always require the init-container.
 
 ## Error connecting to GKE or EKS cluster
 
