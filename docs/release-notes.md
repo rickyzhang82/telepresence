@@ -100,6 +100,12 @@ These recursions can now be prevented by setting the client configuration proper
 The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart called anything but "traffic-manager". This restriction has been lifted.
 </div>
 
+## <div style="display:flex;"><img src="images/feature.png" alt="feature" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Add Windows arm64 client build</div></div>
+<div style="margin-left: 15px">
+
+Telepresence client is now available for Windows ARM64. Updated the release workflow files in github actions to build and publish the Windows ARM64 client.
+</div>
+
 ## <div style="display:flex;"><img src="images/change.png" alt="change" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">The --agents flag to telepresence uninstall is now the default.</div></div>
 <div style="margin-left: 15px">
 
@@ -122,7 +128,7 @@ There's no need for two configmaps that store configuration data for the traffic
 ## <div style="display:flex;"><img src="images/change.png" alt="change" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Tracing was removed.</div></div>
 <div style="margin-left: 15px">
 
-The ability to collect trace has been removed along with the `telepresence gather-traces` and  `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
+The ability to collect trace has been removed along with the `telepresence gather-traces` and `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
 </div>
 
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Cap timeouts.connectivityCheck at 5 seconds.</div></div>
