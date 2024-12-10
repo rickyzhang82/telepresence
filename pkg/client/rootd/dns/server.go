@@ -511,7 +511,7 @@ func (s *Server) flushDNS() {
 }
 
 // splitToUDPAddr splits the given address into an UDPAddr. It's
-// an  error if the address is based on a hostname rather than an IP.
+// an error if the address is based on a hostname rather than an IP.
 func splitToUDPAddr(netAddr net.Addr) (*net.UDPAddr, error) {
 	ip, port, err := iputil.SplitToIPPort(netAddr)
 	if err != nil {
@@ -647,17 +647,13 @@ func (s *Server) resolveThruCache(q *dns.Question) (answer dnsproxy.RRs, rCode i
 
 	atomic.StoreInt32(&dv.currentQType, int32(q.Qtype))
 	defer func() {
-		if rCode != dns.RcodeSuccess {
-			s.cache.Delete(key) // Don't cache unless the lookup succeeded.
-		} else {
-			dv.answer = answer
-			dv.rCode = rCode
+		dv.answer = answer
+		dv.rCode = rCode
 
-			// Return a result for the correct query type. The result will be nil (nxdomain) if nothing was found. It might
-			// also be empty if no RRs were found for the given query type and that is OK.
-			// See https://datatracker.ietf.org/doc/html/rfc4074#section-3
-			answer = copyRRs(answer, []uint16{q.Qtype})
-		}
+		// Return a result for the correct query type. The result will be nil (nxdomain) if nothing was found. It might
+		// also be empty if no RRs were found for the given query type and that is OK.
+		// See https://datatracker.ietf.org/doc/html/rfc4074#section-3
+		answer = copyRRs(answer, []uint16{q.Qtype})
 		atomic.StoreInt32(&dv.currentQType, int32(dns.TypeNone))
 		dv.close()
 	}()
