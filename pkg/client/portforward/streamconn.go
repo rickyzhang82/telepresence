@@ -204,10 +204,14 @@ func (pc *podConn) Dial(ctx context.Context, remotePort uint16) (conn net.Conn, 
 }
 
 func (pc *podConn) Close() error {
+	// Must close before calling onClose, because the close
+	// will release a channel that in some situations will
+	// block the onClose().
+	err := pc.Connection.Close()
 	if pc.onClose != nil {
 		pc.onClose()
 	}
-	return pc.Connection.Close()
+	return err
 }
 
 // portConn implements net.Conn and represents a connection to a specific port in a pod.

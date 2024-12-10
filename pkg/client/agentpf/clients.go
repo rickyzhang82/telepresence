@@ -88,7 +88,8 @@ func (ac *client) connect(ctx context.Context, deleteMe func()) {
 	ac.Lock()
 	ac.cli = cli
 	ac.cancelClient = func() {
-		conn.Close()
+		// Need to run this in a separate thread to avoid deadlock.
+		go conn.Close()
 	}
 	intercepted := ac.info.Intercepted
 	ac.Unlock()
