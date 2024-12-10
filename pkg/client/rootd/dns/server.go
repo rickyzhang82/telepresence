@@ -620,7 +620,7 @@ func (s *Server) resolveWithRecursionCheck(q *dns.Question) (dnsproxy.RRs, int, 
 // entry is found that hasn't expired, it's returned. If not, this function will call
 // resolveQuery() to resolve and store in the case.
 func (s *Server) resolveThruCache(q *dns.Question) (answer dnsproxy.RRs, rCode int, err error) {
-	dv := &cacheEntry{wait: make(chan struct{}), created: time.Now()}
+	dv := &cacheEntry{wait: make(chan struct{}), created: time.Now(), rCode: -1}
 	key := cacheKey{name: q.Name, qType: q.Qtype}
 	if oldDv, loaded := s.cache.LoadOrStore(key, dv); loaded {
 		if atomic.LoadInt32(&s.recursive) == recursionDetected && atomic.LoadInt32(&oldDv.currentQType) == int32(q.Qtype) {
@@ -629,7 +629,7 @@ func (s *Server) resolveThruCache(q *dns.Question) (answer dnsproxy.RRs, rCode i
 			return nil, dns.RcodeNameError, nil
 		}
 		<-oldDv.wait
-		if !oldDv.expired() {
+		if oldDv.rCode >= 0 && !oldDv.expired() {
 			qTypes := []uint16{q.Qtype}
 			if q.Qtype != dns.TypeCNAME {
 				// Allow additional CNAME records if they are present.
