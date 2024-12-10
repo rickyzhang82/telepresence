@@ -30,6 +30,9 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .podSecurityContext | nindent 8 }}
+      {{- if .hostNetwork }}
+      hostNetwork: true
+      {{- end }}
       containers:
         - name: {{ include "traffic-manager.name" $ }}
           securityContext:

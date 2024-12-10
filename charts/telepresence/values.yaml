@@ -31,6 +31,11 @@ podAnnotations: {}
 
 podLabels: {}
 
+# Sets the spec.template.spec.hostNetwork for the Traffic Manager.
+# Set this to true when using Calico on AWS EKS to ensure that the mutating webhook can
+# communicate with the traffic manager.
+hostNetwork: false
+
 podSecurityContext: {}
   # fsGroup: 2000
 

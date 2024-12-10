@@ -115,6 +115,14 @@ Kubernetes takes care of the rest and will now associate the service's `targetPo
 > If the service is "headless" (using `ClusterIP: None`), then using named ports won't help because the `targetPort` will
 > not get remapped. A headless service will always require the init-container.
 
+## EKS, Calico, and Traffic Agent injection timeouts
+
+When using EKS with Calico CNI, the Kubernetes API server cannot reach the mutating webhook
+used for triggering the traffic agent injection. To solve this problem, try providing the
+Helm chart value `"hostNetwork=true"` when installing or upgrading the traffic-manager.
+
+More information can be found in this [blog post](https://medium.com/@denisstortisilva/kubernetes-eks-calico-and-custom-admission-webhooks-a2956b49bd0d).
+
 ## Error connecting to GKE or EKS cluster
 
 GKE and EKS require a plugin that utilizes their resepective IAM providers. 
