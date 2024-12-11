@@ -112,6 +112,12 @@ Telepresence client is now available for Windows ARM64. Updated the release work
 The `telepresence uninstall` was once capable of uninstalling the traffic-manager as well as traffic-agents. This behavior has been deprecated for some time now and in this release, the command is all about uninstalling the agents. Therefore the `--agents` flag was made redundant and whatever arguments that are given to the command must be name of workloads that have an agent installed unless the `--all-agents` is used, in which case no arguments are allowed.
 </div>
 
+## <div style="display:flex;"><img src="images/change.png" alt="change" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Performance improvement for the telepresence list command</div></div>
+<div style="margin-left: 15px">
+
+The `telepresence list` command will now retrieve its data from the traffic-manager, which significantly improves its performance when used on namespaces that have a lot of workloads.
+</div>
+
 ## <div style="display:flex;"><img src="images/change.png" alt="change" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">During an intercept, the local port defaults to the targeted port of the intercepted container instead of 8080.</div></div>
 <div style="margin-left: 15px">
 
