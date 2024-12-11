@@ -187,7 +187,7 @@ jobs:
           fi
       - name: test binary
         shell: bash
-        if: ${{ !(runner.os == 'Linux' && runner.arch == 'X64' && matrix.arch == 'arm64') }}
+        if: ${{ !((runner.os == 'Linux' || runner.os == 'Windows') && runner.arch == 'X64' && matrix.arch == 'arm64') }}
         run: |
           chmod +x ./telepresence
 
