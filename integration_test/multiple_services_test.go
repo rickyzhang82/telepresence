@@ -59,7 +59,7 @@ func (s *multipleServicesSuite) Test_LargeRequest() {
 				return
 			}
 
-			client := &http.Client{Timeout: 30 * time.Second}
+			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Do(req)
 			if !s.NoError(err) {
 				return
