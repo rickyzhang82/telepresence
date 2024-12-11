@@ -4,7 +4,6 @@ package docker
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -328,9 +327,6 @@ func handleLocalK8s(ctx context.Context, daemonID *daemon.Identifier, config *ap
 // options DaemonOptions and DaemonArgs to start the image, and finally connectDaemon to connect to it. A
 // successful start yields a cache.Info entry in the cache.
 func LaunchDaemon(ctx context.Context, daemonID *daemon.Identifier) (conn *grpc.ClientConn, err error) {
-	if proc.RunningInContainer() {
-		return nil, errors.New("unable to start a docker container from within a container")
-	}
 	image := ClientImage(ctx)
 	if err = PullImage(ctx, image); err != nil {
 		return nil, err

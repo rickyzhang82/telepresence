@@ -8,6 +8,8 @@ import "context"
 func RunningInContainer() bool {
 	return false
 }
+func SetRunningInContainer(_ bool) {
+}
 
 func AppendOSSpecificContainerOpts(ctx context.Context, opts []string) ([]string, error) {
 	return opts, nil

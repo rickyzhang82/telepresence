@@ -137,6 +137,12 @@ There's no need for two configmaps that store configuration data for the traffic
 The ability to collect trace has been removed along with the `telepresence gather-traces` and `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
 </div>
 
+## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Fix telepresence connect confusion caused by /.dockerenv file</div></div>
+<div style="margin-left: 15px">
+
+A `/.dockerenv` will be present when running in a GitHub Codespaces environment. That doesn't mean that telepresence cannot use docker, or that the root daemon shouldn't start.
+</div>
+
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Cap timeouts.connectivityCheck at 5 seconds.</div></div>
 <div style="margin-left: 15px">
 
