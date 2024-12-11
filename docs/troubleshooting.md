@@ -3,8 +3,6 @@ title: Troubleshooting
 description: "Learn how to troubleshoot common issues related to Telepresence, including intercept issues, cluster connection issues, and errors related to Ambassador Cloud."
 ---
 
-import Platform from '@site/src/components/Platform';
-
 # Troubleshooting
 
 ## Connecting to a cluster via VPN doesn't work.

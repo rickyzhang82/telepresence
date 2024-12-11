@@ -2,6 +2,8 @@
 title: Telepresence and VPNs
 ---
 
+import Platform from '@site/src/components/Platform';
+
 # Telepresence and VPNs
 
 Telepresence creates a virtual network interface (VIF) when it connects. This VIF is configured to route the cluster's 
