@@ -204,6 +204,11 @@ items:
           `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since
           its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
       - type: bugfix
+        title: Remove obsolete code checking the Docker Bridge for DNS
+        body: >-
+          The DNS resolver checked the Docker bridge for messages on Linux. This code was obsolete and caused problems
+          when running in Codespaces.
+      - type: bugfix
         title: Fix telepresence connect confusion caused by /.dockerenv file
         body: >-
           A `/.dockerenv` will be present when running in a GitHub Codespaces environment. That doesn't mean that
