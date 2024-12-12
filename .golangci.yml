@@ -84,6 +84,7 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - copyloopvar
     - cyclop
     - decorder
     - depguard
@@ -91,7 +92,6 @@ linters:
     - durationcheck
     - errcheck
     - errname
-    - exportloopref
     - forbidigo
     - gochecknoglobals
     - gocognit
@@ -140,7 +140,6 @@ linters:
     - err113
     - godox
     - goimports
-    - gomnd
     - gomoddirectives
     - gosec
     - interfacebloat

@@ -803,7 +803,6 @@ func TestTrafficAgentConfigGenerator(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test // pin it
 		t.Run(test.name, func(t *testing.T) {
 			runFunc(t, &test, k8sapi.Http2Probe)
 		})
@@ -1820,7 +1819,6 @@ func TestTrafficAgentInjector(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test // pin it
 		t.Run(test.name, func(t *testing.T) {
 			ctx := dlog.NewTestContext(t, false)
 			env := &managerutil.Env{
