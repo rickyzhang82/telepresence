@@ -137,6 +137,12 @@ There's no need for two configmaps that store configuration data for the traffic
 The ability to collect trace has been removed along with the `telepresence gather-traces` and `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
 </div>
 
+## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Remove obsolete code checking the Docker Bridge for DNS</div></div>
+<div style="margin-left: 15px">
+
+The DNS resolver checked the Docker bridge for messages on Linux. This code was obsolete and caused problems when running in Codespaces.
+</div>
+
 ## <div style="display:flex;"><img src="images/bugfix.png" alt="bugfix" style="width:30px;height:fit-content;"/><div style="display:flex;margin-left:7px;">Fix telepresence connect confusion caused by /.dockerenv file</div></div>
 <div style="margin-left: 15px">
 
