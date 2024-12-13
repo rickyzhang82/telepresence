@@ -34,7 +34,7 @@ docDescription: >-
   customizable development environments.
 items:
   - version: 2.21.0
-    date: TBD
+    date: 2024-12-13
     notes:
       - type: feature
         title: Automatic VPN conflict avoidance
