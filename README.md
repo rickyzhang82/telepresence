@@ -378,7 +378,6 @@ managerHost: traffic-manager.ambassador
 managerPort: 8081
 namespace: default
 pullPolicy: IfNotPresent
-tracingPort: 15766
 workloadKind: Deployment
 workloadName: hello
 
@@ -400,7 +399,7 @@ $ telepresence helm uninstall
 will remove everything that was automatically installed by telepresence from the cluster.
 
 ```console
-$ telepresence uninstall --agent hello
+$ telepresence uninstall hello
 ```
 will remove the traffic-agent and the configmap entry.
 

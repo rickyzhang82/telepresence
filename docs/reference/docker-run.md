@@ -16,9 +16,30 @@ You can start the Telepresence daemon in a Docker container on your laptop using
 $ telepresence connect --docker
 ```
 
-The `--docker` flag is a global flag, and if passed directly like `telepresence intercept --docker`, then the implicit connect that takes place if no connections is active, will use a container based daemon.
+The `--docker` flag is a global flag, and if passed directly like `telepresence intercept --docker`, then the implicit connect that takes place if no connections are active, will use a container-based daemon.
 
-### The docker-run flag
+### The telepresence curl command
+
+The network interface that is added when connecting using `telepresence connect --docker` will not be accessible directly from the host computer. It is confined to the telepresence daemon container, and there you should not expect to be able to curl your cluster resources directly.
+
+You can use the `telepresence curl` command to curl your cluster resources. This command will run curl in a docker container that shares the network of the daemon container.
+
+### The telepresence docker-run command
+
+The `telepresence docker-run` command will start a container that automatically shares the daemon container network. It
+will also circumvent Docker limitations that prevent containers that share another container's network to also make
+ports available using `--publish`, `--expose`, or adding additional networks using `--network`.
+
+To achieve this, Telepresence temporarily adds the necessary network to the containerized daemon. This allows the new
+container to join the  same network. Additionally, Telepresence starts extra socat containers to handle port mappings,
+ensuring that the desired ports are exposed to the local environment.
+
+> [!NOTE]
+> If you use `telepresence docker-run` to run a command that lasts longer than the `telepresence connect --docker` that
+> was in effect when it started, then it will lose its network. In other words, when using `telepresence docker-run`,
+> you must always rerun after a `telepresence quit`/`telepresence connect --docker`.
+
+### The ingest/intercept --docker-run flag
 
 If you want your ingest or intercept to use another Docker container, you can use the `--docker-run` flag. It creates the ingest or intercept, runs your container in the foreground, then automatically ends the ingest or intercept when the container exits.
 
@@ -26,12 +47,7 @@ After establishing a connection to a cluster using `telepresence connect --docke
 the same network as the containerized daemon that maintains the connection. This enables seamless communication between your local development
 environment and the remote cluster.
 
-Normally, Docker has a limitation that prevents combining a shared network configuration with custom networks and exposing ports. However,
-Telepresence elegantly circumvents this limitation so that you can use `docker run` flags like `--network`, `--publish`, or `--expose`.
-
-To achieve this, Telepresence temporarily adds the necessary network to the containerized daemon. This allows the new container to join the
-same network. Additionally, Telepresence starts extra socat containers to handle port mappings, ensuring that the desired ports are exposed
-to the local environment.
+The `docker run` flags `--network`, `--publish`, or `--expose` are all available, just as with the `docker-run` command.
 
 ```console
 $ telepresence intercept <workload_name> --port <port> --docker-run -- <docker run flags> <image> <container arguments>

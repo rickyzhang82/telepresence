@@ -97,7 +97,6 @@ func (s *proxyViaSuite) Test_ProxyViaLoopBack() {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		s.Run(tt.name, func() {
 			rq := s.Require()
 			var vip netip.Addr

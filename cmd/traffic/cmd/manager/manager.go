@@ -13,8 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -31,7 +29,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/agentmap"
 	"github.com/telepresenceio/telepresence/v2/pkg/informer"
 	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 	"github.com/telepresenceio/telepresence/v2/pkg/version"
 )
 
@@ -69,26 +66,11 @@ func MainWithEnv(ctx context.Context) (err error) {
 	dlog.Infof(ctx, "%s %s [uid:%d,gid:%d]", DisplayName, version.Version, os.Getuid(), os.Getgid())
 
 	env := managerutil.GetEnv(ctx)
-	var tracer *tracing.TraceServer
-
-	if env.TracingGrpcPort != 0 {
-		tracer, err = tracing.NewTraceServer(ctx, "traffic-manager",
-			attribute.String("tel2.agent-image", env.QualifiedAgentImage()),
-			attribute.String("tel2.managed-namespaces", strings.Join(env.ManagedNamespaces, ",")),
-			attribute.String("k8s.namespace", env.ManagerNamespace),
-			attribute.String("k8s.pod-ip", env.PodIP.String()),
-		)
-		if err != nil {
-			return err
-		}
-		defer tracer.Shutdown(ctx)
-	}
 
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		return fmt.Errorf("unable to get the Kubernetes InClusterConfig: %w", err)
 	}
-	cfg.WrapTransport = tracing.NewWrapperFunc()
 	ki, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("unable to create the Kubernetes Interface from InClusterConfig: %w", err)
@@ -157,12 +139,6 @@ func MainWithEnv(ctx context.Context) (err error) {
 	}
 
 	g.Go("session-gc", mgr.runSessionGCLoop)
-
-	if tracer != nil {
-		g.Go("tracer-grpc", func(c context.Context) error {
-			return tracer.ServeGrpc(c, env.TracingGrpcPort)
-		})
-	}
 
 	// Wait for exit
 	return g.Wait()
@@ -276,9 +252,7 @@ func (s *service) serveHTTP(ctx context.Context) error {
 	env := managerutil.GetEnv(ctx)
 	host := env.ServerHost
 	port := env.ServerPort
-	opts := []grpc.ServerOption{
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-	}
+	var opts []grpc.ServerOption
 	if mz, ok := env.MaxReceiveSize.AsInt64(); ok {
 		opts = append(opts, grpc.MaxRecvMsgSize(int(mz)))
 	}

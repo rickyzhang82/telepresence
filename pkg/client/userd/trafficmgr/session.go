@@ -18,7 +18,6 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/google/uuid"
 	"github.com/puzpuzpuz/xsync/v3"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -1024,9 +1023,7 @@ func (s *session) connectRootDaemon(ctx context.Context, nc *rootdRpc.NetworkCon
 		rd = rootSession
 	} else {
 		var conn *grpc.ClientConn
-		conn, err = socket.Dial(ctx, socket.RootDaemonPath(ctx), true,
-			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		)
+		conn, err = socket.Dial(ctx, socket.RootDaemonPath(ctx), true)
 		if err != nil {
 			return nil, fmt.Errorf("unable open root daemon socket: %w", err)
 		}
@@ -1037,9 +1034,10 @@ func (s *session) connectRootDaemon(ctx context.Context, nc *rootdRpc.NetworkCon
 		}()
 		rd = rootdRpc.NewDaemonClient(conn)
 
+		tmTimeout := client.GetConfig(ctx).Timeouts().Get(client.TimeoutTrafficManagerConnect)
 		for attempt := 1; ; attempt++ {
 			var rootStatus *rootdRpc.DaemonStatus
-			tCtx, tCancel := context.WithTimeout(ctx, 15*time.Second)
+			tCtx, tCancel := context.WithTimeout(ctx, tmTimeout/2)
 			rootStatus, err = rd.Connect(tCtx, nc)
 			tCancel()
 			if err != nil {

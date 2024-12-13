@@ -66,7 +66,7 @@ spec:
             - mountPath: "/usr/share/data"
               name: socat-data
         - name: echo
-          image: jmalloc/echo-server
+          image: ghcr.io/telepresenceio/echo-server:latest
           env:
             - name: TAG
               value: echo-server

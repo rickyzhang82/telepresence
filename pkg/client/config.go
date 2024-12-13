@@ -518,6 +518,7 @@ const (
 	defaultTimeoutsFtpReadWrite          = 1 * time.Minute
 	defaultTimeoutsFtpShutdown           = 2 * time.Minute
 	defaultTimeoutsContainerShutdown     = 0
+	maxTimeoutsConnectivityCheck         = 5 * time.Second
 )
 
 var defaultTimeouts = Timeouts{ //nolint:gochecknoglobals // constant
@@ -542,6 +543,9 @@ func (t *Timeouts) defaults() DefaultsAware {
 // merge merges this instance with the non-zero values of the given argument. The argument values take priority.
 func (t *Timeouts) merge(o *Timeouts) {
 	mergeNonDefaults(t, o)
+	if t.PrivateConnectivityCheck > maxTimeoutsConnectivityCheck {
+		t.PrivateConnectivityCheck = maxTimeoutsConnectivityCheck
+	}
 }
 
 // IsZero controls whether this element will be included in marshalled output.

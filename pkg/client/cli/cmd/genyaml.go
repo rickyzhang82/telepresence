@@ -25,7 +25,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/client"
 	"github.com/telepresenceio/telepresence/v2/pkg/client/cli/flags"
 	"github.com/telepresenceio/telepresence/v2/pkg/errcat"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 )
 
 type genYAMLCommand struct {
@@ -138,7 +137,7 @@ func (i *genYAMLCommand) loadWorkload(ctx context.Context) (k8sapi.Workload, err
 		if i.workloadName == "" {
 			return nil, errcat.User.New("either --input or --workload must be provided")
 		}
-		return tracing.GetWorkload(ctx, i.workloadName, i.namespace, "")
+		return k8sapi.GetWorkload(ctx, i.workloadName, i.namespace, "")
 	}
 	b, err := getInput(i.inputFile)
 	if err != nil {

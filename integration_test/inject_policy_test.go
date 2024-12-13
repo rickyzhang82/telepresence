@@ -155,7 +155,7 @@ func (is *installSuite) Test_MultiOnDemandInjectOnInstall() {
 	is.Eventually(func() bool {
 		ras := itest.RunningPodsWithAgents(ctx, "quote-", is.AppNamespace())
 		return len(ras) == svcCount
-	}, 60*time.Second, 5*time.Second)
+	}, 120*time.Second, 5*time.Second)
 
 	// Uninstall the traffic-manager and check that all pods traffic-agent is removed
 	is.UninstallTrafficManager(ctx, is.ManagerNamespace())

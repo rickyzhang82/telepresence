@@ -12,8 +12,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	admission "k8s.io/api/admission/v1"
 	core "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +25,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/agentconfig"
 	"github.com/telepresenceio/telepresence/v2/pkg/agentmap"
 	"github.com/telepresenceio/telepresence/v2/pkg/maps"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 	"github.com/telepresenceio/telepresence/v2/pkg/workload"
 )
 
@@ -98,8 +95,6 @@ func (a *agentInjector) Inject(ctx context.Context, req *admission.AdmissionRequ
 			dlog.Errorf(ctx, "%+v", err)
 		}
 	}()
-	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "mutator.inject")
-	defer tracing.EndAndRecord(span, err)
 
 	isDelete := req.Operation == admission.Delete
 	if atomic.LoadInt64(&a.terminating) > 0 {
@@ -120,12 +115,6 @@ func (a *agentInjector) Inject(ctx context.Context, req *admission.AdmissionRequ
 	env := managerutil.GetEnv(ctx)
 
 	ia := pod.Annotations[agentconfig.InjectAnnotation]
-	span.SetAttributes(
-		attribute.String("tel2.pod-name", pod.Name),
-		attribute.String("tel2.pod-namespace", pod.Namespace),
-		attribute.String("tel2.operation", string(req.Operation)),
-		attribute.String("tel2."+agentconfig.InjectAnnotation, ia),
-	)
 
 	var scx agentconfig.SidecarExt
 	switch ia {
@@ -190,8 +179,6 @@ func (a *agentInjector) Inject(ctx context.Context, req *admission.AdmissionRequ
 			dlog.Debugf(ctx, "Skipping webhook where agent is manually injected %s.%s", pod.Name, pod.Namespace)
 			return nil, nil
 		}
-
-		tracing.RecordWorkloadInfo(span, wl)
 	default:
 		return nil, fmt.Errorf("invalid value %q for annotation %s", ia, agentconfig.InjectAnnotation)
 	}
@@ -216,7 +203,6 @@ func (a *agentInjector) Inject(ctx context.Context, req *admission.AdmissionRequ
 	// Create patch operations to add the traffic-agent sidecar
 	if len(patches) > 0 {
 		dlog.Infof(ctx, "Injecting %d patches into pod %s.%s", len(patches), pod.Name, pod.Namespace)
-		span.SetAttributes(attribute.Stringer("tel2.patches", patches))
 	}
 	return patches, nil
 }

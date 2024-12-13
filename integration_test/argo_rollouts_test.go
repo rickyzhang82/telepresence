@@ -110,7 +110,7 @@ func (s *argoRolloutsSuite) Test_SuccessfullyInterceptsArgoRollout() {
 
 	dfltCtx := itest.WithUser(ctx, "default")
 	itest.TelepresenceOk(dfltCtx, "connect", "--namespace", s.AppNamespace(), "--manager-namespace", s.ManagerNamespace())
-	itest.TelepresenceOk(dfltCtx, "uninstall", "--agent", svc)
+	itest.TelepresenceOk(dfltCtx, "uninstall", svc)
 	itest.TelepresenceDisconnectOk(dfltCtx)
 	s.TelepresenceConnect(ctx)
 

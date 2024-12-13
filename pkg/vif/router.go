@@ -3,7 +3,9 @@ package vif
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/netip"
+	"runtime"
 	"slices"
 
 	"github.com/datawire/dlib/dlog"
@@ -117,7 +119,6 @@ func (rt *Router) UpdateRoutes(ctx context.Context, pleaseProxy, dontProxy, dont
 	}
 
 	var staticNets []netip.Prefix
-	var pr *routing.Route
 	for _, sn := range added {
 		var err error
 		bits := sn.Bits()
@@ -126,24 +127,25 @@ func (rt *Router) UpdateRoutes(ctx context.Context, pleaseProxy, dontProxy, dont
 			continue
 		}
 
+		// On linux, this adds a link, so it's still relevant after adding a static route.
 		if err = rt.device.AddSubnet(ctx, sn); err != nil {
 			dlog.Errorf(ctx, "failed to add subnet %s: %v", sn, err)
 			continue
 		}
 
-		if pr == nil {
-			if pr, err = routing.GetRoute(ctx, sn); err != nil {
-				dlog.Errorf(ctx, "failed to retrieve route for subnet %s: %v", sn, err)
+		if runtime.GOOS == "linux" {
+			// On linux, we use static routes for conflicting subnets, because those subnets will then belong
+			// to our own routing table.
+			if slices.ContainsFunc(rt.whitelistedSubnets, func(r netip.Prefix) bool { return r.Overlaps(sn) }) {
+				dlog.Debugf(ctx, "Using static route for %s because it is an override", sn)
+				staticNets = append(staticNets, sn)
 			}
 		}
 	}
-	if len(staticNets) > 0 && pr == nil {
-		return fmt.Errorf("unable to route subnets %v, because there's no subnet with a mask smaller than 31 bits", staticNets)
-	}
-	return rt.addStaticOverrides(ctx, dontProxy, dontProxyOverrides, staticNets, pr)
+	return rt.addStaticOverrides(ctx, dontProxy, dontProxyOverrides, staticNets)
 }
 
-func (rt *Router) addStaticOverrides(ctx context.Context, neverProxy, neverProxyOverrides, staticNets []netip.Prefix, primaryRoute *routing.Route) (err error) {
+func (rt *Router) addStaticOverrides(ctx context.Context, neverProxy, neverProxyOverrides, staticNets []netip.Prefix) (err error) {
 	desired := make([]*routing.Route, 0, len(neverProxy)+len(neverProxyOverrides))
 	dr, err := routing.DefaultRoute(ctx)
 	if err != nil {
@@ -176,14 +178,37 @@ func (rt *Router) addStaticOverrides(ctx context.Context, neverProxy, neverProxy
 		}
 	}
 
-	for _, sn := range staticNets {
-		desired = append(desired, &routing.Route{
-			LocalIP:   primaryRoute.LocalIP,
-			RoutedNet: sn,
-			Interface: primaryRoute.Interface,
-			Gateway:   primaryRoute.Gateway,
-			Default:   false,
-		})
+	if len(staticNets) > 0 {
+		ifd, err := net.InterfaceByIndex(int(rt.device.Index()))
+		if err != nil {
+			return err
+		}
+		var pr *routing.Route
+		if dr.Interface.Index == ifd.Index {
+			pr = dr
+		} else {
+			addrs, err := ifd.Addrs()
+			if err != nil {
+				return err
+			}
+			pr = &routing.Route{
+				Interface: ifd,
+			}
+			if len(addrs) > 0 {
+				if pfx, err := netip.ParsePrefix(addrs[0].String()); err == nil {
+					pr.LocalIP = pfx.Addr()
+				}
+			}
+		}
+
+		for _, sn := range staticNets {
+			desired = append(desired, &routing.Route{
+				LocalIP:   pr.LocalIP,
+				Gateway:   pr.Gateway,
+				RoutedNet: sn,
+				Interface: ifd,
+			})
+		}
 	}
 
 	for _, r := range desired {

@@ -37,23 +37,22 @@ items:
     date: TBD
     notes:
       - type: feature
-        title: Automatic subnet conflict avoidance
-        body: ->
-          Telepresence not only detects when the cluster's subnets are in conflict with subnets on the workstation, it
-          will also avoid such conflicts by doing network address translations, placing a conflicting subnet in a
-          virtual subnet.
-        docs: https://telepresence.io/docs/reference/vpn
+        title: Automatic VPN conflict avoidance
+        body: >-
+          Telepresence not only detects subnet conflicts between the cluster and workstation VPNs but also resolves them
+          by performing network address translation to move conflicting subnets out of the way.
+        docs: reference/vpn
       - type: feature
         title: Virtual Address Translation (VNAT).
-        body: ->
+        body: >-
           It is now possible to use a virtual subnet without routing the affected IPs to a specific workload. A new
           `telepresence connect --vnat CIDR` flag was added that will perform virtual network address translation of
           cluster IPs. This flag is very similar to the `--proxy-via CIDR=WORKLOAD` introduced in 2.19, but without
           the need to specify a workload.
-        docs: https://telepresence.io/docs/reference/vpn
+        docs: reference/vpn
       - type: feature
         title: Intercepts targeting a specific container
-        body: ->
+        body: >-
           In certain scenarios, the container owning the intercepted port differs
           from the container the intercept targets. This port owner's sole purpose
           is to route traffic from the service to the intended container, often
@@ -64,7 +63,7 @@ items:
           guarantees that the environment variables and mounts propagated to the
           client originate from the specified container. Additionally, if the
           `--replace` option is used, it ensures that this container is replaced.
-        docs: https://telepresence.io/docs/reference/intercepts/container
+        docs: reference/intercepts/container
       - type: feature
         title: New telepresence ingest command
         body: >-
@@ -72,21 +71,24 @@ items:
           volume mounts and environment variables of a targeted container. However, unlike `telepresence intercept`,
           `telepresence ingest` does not redirect traffic to the container and ensures that the mounted volumes are
           read-only.
-          
+
           An ingest requires a traffic-agent to be installed in the pods of the targeted workload. Beyond that, it's
           a client-side operation. This allows developers to have multiple simultaneous ingests on the same container.
+        docs: howtos/intercepts#ingest-your-service
       - type: feature
         title: New telepresence curl command
         body: >-
           The new `telepresence curl` command runs curl from within a container. The command requires that a connection
           has been established using `telepresence connect --docker`, and the container that runs `curl` will share the
           same network as the containerized telepresence daemon.
+        docs: reference/docker-run#the-telepresence-curl-command
       - type: feature
         title: New telepresence docker-run command
         body: >-
           The new `telepresence docker-run <flags and arguments>` requires that a connection has been established using
           `telepresence connect --docker` It will perform a `docker run <flags and arguments>` and add the flag necessary
           to ensure that started container shares the same network as the containerized telepresence daemon.
+        docs: reference/docker-run#the-telepresence-docker-run-command
       - type: feature
         title: Mount everything read-only during intercept
         body: >-
@@ -105,7 +107,7 @@ items:
 
           While the old-style Kubernetes extension is still supported for compatibility, it cannot be used with the new
           style.
-        docs: https://telepresence.io/docs/reference/config
+        docs: reference/config
       - type: feature
         title: Use WebSockets for port-forward instead of the now deprecated SPDY.
         body: >-
@@ -126,18 +128,19 @@ items:
           The Helm chart value `workloads` now supports the kinds `deployments.enabled`, `statefulSets.enabled`, `replicaSets.enabled`.
           and `rollouts.enabled`. All except `rollouts` are enabled by default. The traffic-manager will ignore workloads, and
           Telepresence will not be able to intercept them, if the `enabled` of the corresponding kind is set to `false`.
+        docs: reference/intecepts/sidecar#disable-workloads
       - type: feature
         title: Improved command auto-completion
         body: >-
           The auto-completion of namespaces, services, and containers have been added where appropriate, and the default
           file auto completion has been removed from most commands.
-      - feature:
+      - type: feature
         title: Docker run flags --publish, --expose, and --network now work with docker mode connections
         body: >-
           After establishing a connection to a cluster using `telepresence connect --docker`, you can run new containers that share
           the same network as the containerized daemon that maintains the connection. This enables seamless communication between
           your local development environment and the remote services.
-          
+
           Normally, Docker has a limitation that prevents combining a shared network configuration with custom networks
           and exposing ports. However, Telepresence now elegantly circumvents this limitation so that a container started with
           `telepresence docker-run`, `telepresence intercept --docker-run`, or `telepresence ingest --docker-run` can use flags
@@ -146,6 +149,7 @@ items:
           To achieve this, Telepresence temporarily adds the necessary network to the containerized daemon. This allows the new
           container to join the same network. Additionally, Telepresence starts extra socat containers to handle port mapping,
           ensuring that the desired ports are exposed to the local environment.
+        docs: reference/docker-run#the-telepresence-docker-run-command
       - type: feature
         title: Prevent recursion in the Telepresence Virtual Network Interface (VIF)
         body: >-
@@ -156,20 +160,70 @@ items:
           These recursions can now be prevented by setting the client configuration property
           `routing.recursionBlockDuration` so that new connection attempts are temporarily blocked for a specific
           IP:PORT pair immediately after an initial attempt, thereby effectively ending the recursion.
-        docs: https://telepresence.io/docs/howtos/cluster-in-vm
+        docs: howtos/cluster-in-vm
       - type: feature
         title: Allow Helm chart to be included as a sub-chart
         body: >-
           The Helm chart previously had the unnecessary restriction that the .Release.Name under which telepresence is installed is literally
           called "traffic-manager".  This restriction was preventing telepresence from being included as a sub-chart in a parent chart
-          called anything but "traffic-manager".  This restriction has been lifted.
+          called anything but "traffic-manager". This restriction has been lifted.
+      - type: feature
+        title: Add Windows arm64 client build
+        body: >-
+          Telepresence client is now available for Windows ARM64.
+          Updated the release workflow files in github actions to build and publish the Windows ARM64 client.
+      - type: change
+        title: The --agents flag to telepresence uninstall is now the default.
+        body: >-
+          The `telepresence uninstall` was once capable of uninstalling the traffic-manager as well as traffic-agents.
+          This behavior has been deprecated for some time now and in this release, the command is all about uninstalling
+          the agents. Therefore the `--agents` flag was made redundant and whatever arguments that are given to the
+          command must be name of workloads that have an agent installed unless the `--all-agents` is used, in which
+          case no arguments are allowed.
+      - type: change
+        title: Performance improvement for the telepresence list command
+        body: >-
+          The `telepresence list` command will now retrieve its data from the traffic-manager, which significantly
+          improves its performance when used on namespaces that have a lot of workloads.
       - type: change
         title: During an intercept, the local port defaults to the targeted port of the intercepted container instead of 8080.
         body: >-
           Telepresence mimics the environment of a target container during an intercept, so it's only natural that the default
           for the local port is determined by the targeted container port rather than just defaulting to 8080.
-          
+
           A default can still be explicitly defined using the `config.intercept.defaultPort` setting.
+      - type: change
+        title: Move the telepresence-intercept-env configmap data into traffic-manager configmap.
+        body: >-
+          There's no need for two configmaps that store configuration data for the traffic manager. The traffic-manager
+          configmap is also watched, so consolidating the configuration there saves some k8s API calls.
+      - type: change
+        title: Tracing was removed.
+        body: >-
+          The ability to collect trace has been removed along with the `telepresence gather-traces` and
+          `telepresence upload-traces` commands. The underlying code was complex and has not been well maintained since
+          its inception in 2022. We have received no feedback on it and seen no indication that it has ever been used.
+      - type: bugfix
+        title: Remove obsolete code checking the Docker Bridge for DNS
+        body: >-
+          The DNS resolver checked the Docker bridge for messages on Linux. This code was obsolete and caused problems
+          when running in Codespaces.
+      - type: bugfix
+        title: Fix telepresence connect confusion caused by /.dockerenv file
+        body: >-
+          A `/.dockerenv` will be present when running in a GitHub Codespaces environment. That doesn't mean that
+          telepresence cannot use docker, or that the root daemon shouldn't start.
+      - type: bugfix
+        title: Cap timeouts.connectivityCheck at 5 seconds.
+        body: >-
+          The timeout value of `timeouts.connectivityCheck` is used when checking if a cluster is already reachable
+          without Telepresence setting up an additional network route. If it is, this timeout should be high enough to
+          cover the delay when establishing a connection. If this delay is higher than a second, then chances are very
+          low that the cluster already is reachable, and if it can, that all accesses to it will be very slow. In such
+          cases, Telepresence will create its own network interface and do perform its own tunneling.
+
+          The default timeout for the check remains at 500 millisecond, which is more than sufficient for the majority
+          of cases.
       - type: bugfix
         title: Prevent that traffic-manager injects a traffic-agent into itself.
         body: >-
@@ -183,9 +237,15 @@ items:
           included there when computing the subnets will often lead to problems when running the cluster locally. This namespace
           is therefore now excluded in situations when the pod subnets are computed from the IPs of pods. Services in this
           namespace will still be available through the service subnet.
-          
+
           If a user should require the pod-subnet to be mapped, it can be added to the `client.routing.alsoProxy`
           list in the helm chart.
+      - type: bugfix
+        title: Let routes belonging to an allowed conflict be added as a static route on Linux.
+        body: >-
+          The `allowConflicting` setting didn't always work on Linux because the conflicting subnet was just added as a
+          link to the TUN device, and therefore didn't get subjected to routing rule used to assign priority to the
+          given subnet.
   - version: 2.20.3
     date: 2024-11-18
     notes:

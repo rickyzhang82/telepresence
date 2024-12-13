@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"go.opentelemetry.io/otel"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -14,7 +13,6 @@ import (
 	"github.com/datawire/dlib/dlog"
 	"github.com/datawire/k8sapi/pkg/k8sapi"
 	"github.com/telepresenceio/telepresence/v2/pkg/agentconfig"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 )
 
 const (
@@ -48,7 +46,6 @@ type BasicGeneratorConfig struct {
 	ManagerPort         uint16
 	AgentPort           uint16
 	APIPort             uint16
-	TracingPort         uint16
 	QualifiedAgentImage string
 	ManagerNamespace    string
 	LogLevel            string
@@ -80,9 +77,6 @@ func (cfg *BasicGeneratorConfig) Generate(
 	wl k8sapi.Workload,
 	existingConfig agentconfig.SidecarExt,
 ) (sc agentconfig.SidecarExt, err error) {
-	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "agentmap.Generate")
-	defer tracing.EndAndRecord(span, err)
-
 	if TrafficManagerSelector.Matches(labels.Set(wl.GetLabels())) {
 		return nil, fmt.Errorf("deployment %s.%s is the Telepresence Traffic Manager. It can not have a traffic-agent", wl.GetName(), wl.GetNamespace())
 	}
@@ -171,7 +165,7 @@ func (cfg *BasicGeneratorConfig) Generate(
 		}
 	}
 
-	ag := &agentconfig.Sidecar{
+	return &agentconfig.Sidecar{
 		AgentImage:      cfg.QualifiedAgentImage,
 		AgentName:       wl.GetName(),
 		LogLevel:        cfg.LogLevel,
@@ -181,16 +175,13 @@ func (cfg *BasicGeneratorConfig) Generate(
 		ManagerHost:     ManagerAppName + "." + cfg.ManagerNamespace,
 		ManagerPort:     cfg.ManagerPort,
 		APIPort:         cfg.APIPort,
-		TracingPort:     cfg.TracingPort,
 		Containers:      ccs,
 		InitResources:   cfg.InitResources,
 		Resources:       cfg.Resources,
 		PullPolicy:      cfg.PullPolicy,
 		PullSecrets:     cfg.PullSecrets,
 		SecurityContext: cfg.SecurityContext,
-	}
-	ag.RecordInSpan(span)
-	return ag, nil
+	}, nil
 }
 
 func appendAgentContainerConfigs(

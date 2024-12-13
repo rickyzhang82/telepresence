@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/puzpuzpuz/xsync/v3"
-	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -89,7 +88,8 @@ func (ac *client) connect(ctx context.Context, deleteMe func()) {
 	ac.Lock()
 	ac.cli = cli
 	ac.cancelClient = func() {
-		conn.Close()
+		// Need to run this in a separate thread to avoid deadlock.
+		go conn.Close()
 	}
 	intercepted := ac.info.Intercepted
 	ac.Unlock()
@@ -339,9 +339,7 @@ outer:
 			}
 			switch status.Code(err) {
 			case codes.OK:
-				ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "AgentClientUpdate")
 				err = s.updateClients(ctx, ais.Agents)
-				span.End()
 				if err != nil {
 					return err
 				}

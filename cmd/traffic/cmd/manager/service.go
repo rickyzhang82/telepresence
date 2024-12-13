@@ -5,24 +5,20 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/google/uuid"
 	dns2 "github.com/miekg/dns"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/exp/maps"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	empty "google.golang.org/protobuf/types/known/emptypb"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/datawire/dlib/derror"
 	"github.com/datawire/dlib/dgroup"
 	"github.com/datawire/dlib/dlog"
-	"github.com/datawire/k8sapi/pkg/k8sapi"
 	rpc "github.com/telepresenceio/telepresence/rpc/v2/manager"
 	"github.com/telepresenceio/telepresence/v2/cmd/traffic/cmd/manager/cluster"
 	"github.com/telepresenceio/telepresence/v2/cmd/traffic/cmd/manager/config"
@@ -31,7 +27,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/cmd/traffic/cmd/manager/state"
 	"github.com/telepresenceio/telepresence/v2/pkg/dnsproxy"
 	"github.com/telepresenceio/telepresence/v2/pkg/iputil"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 	"github.com/telepresenceio/telepresence/v2/pkg/tunnel"
 	"github.com/telepresenceio/telepresence/v2/pkg/version"
 	"github.com/telepresenceio/telepresence/v2/pkg/workload"
@@ -229,14 +224,12 @@ func (s *service) ArriveAsAgent(ctx context.Context, agent *rpc.AgentInfo) (*rpc
 	if val := validateAgent(agent); val != "" {
 		return nil, status.Error(codes.InvalidArgument, val)
 	}
+	mutator.GetMap(ctx).Whitelist(agent.PodName, agent.Namespace)
 
-	for _, ek := range getExcludedEnvVars(ctx) {
-		for _, cn := range agent.Containers {
-			delete(cn.Environment, ek)
-		}
+	for _, cn := range agent.Containers {
+		s.removeExcludedEnvVars(cn.Environment)
 	}
 	sessionID := s.state.AddAgent(agent, s.clock.Now())
-	mutator.GetMap(ctx).Whitelist(agent.PodName, agent.Namespace)
 
 	return &rpc.SessionInfo{
 		SessionId: sessionID,
@@ -555,8 +548,6 @@ func (s *service) PrepareIntercept(ctx context.Context, request *rpc.CreateInter
 	}()
 	ctx = managerutil.WithSessionInfo(ctx, request.Session)
 	dlog.Debugf(ctx, "PrepareIntercept %s called", request.InterceptSpec.Name)
-	span := trace.SpanFromContext(ctx)
-	tracing.RecordInterceptSpec(span, request.InterceptSpec)
 	return s.state.PrepareIntercept(ctx, request)
 }
 
@@ -608,8 +599,6 @@ func (s *service) CreateIntercept(ctx context.Context, ciReq *rpc.CreateIntercep
 	sessionID := ciReq.GetSession().GetSessionId()
 	spec := ciReq.InterceptSpec
 	dlog.Debugf(ctx, "CreateIntercept %s called", ciReq.InterceptSpec.Name)
-	span := trace.SpanFromContext(ctx)
-	tracing.RecordInterceptSpec(span, spec)
 
 	if val := validateIntercept(spec); val != "" {
 		return nil, status.Error(codes.InvalidArgument, val)
@@ -625,9 +614,6 @@ func (s *service) CreateIntercept(ctx context.Context, ciReq *rpc.CreateIntercep
 	client, interceptInfo, err := s.state.AddIntercept(ctx, sessionID, s.clusterInfo.ID(), ciReq)
 	if err != nil {
 		return nil, err
-	}
-	if interceptInfo != nil {
-		tracing.RecordInterceptInfo(span, interceptInfo)
 	}
 
 	if ciReq.InterceptSpec.Replace {
@@ -712,7 +698,7 @@ func (s *service) ReviewIntercept(ctx context.Context, rIReq *rpc.ReviewIntercep
 		return &empty.Empty{}, nil
 	}
 
-	rIReq.Environment = s.removeExcludedEnvVars(ctx, rIReq.Environment)
+	s.removeExcludedEnvVars(rIReq.Environment)
 
 	intercept := s.state.UpdateIntercept(ceptID, func(intercept *rpc.InterceptInfo) {
 		// Sanity check: The reviewing agent must be an agent for the intercept.
@@ -748,25 +734,10 @@ func (s *service) ReviewIntercept(ctx context.Context, rIReq *rpc.ReviewIntercep
 	return &empty.Empty{}, nil
 }
 
-func getExcludedEnvVars(ctx context.Context) []string {
-	cm, err := k8sapi.GetK8sInterface(ctx).CoreV1().ConfigMaps(managerutil.GetEnv(ctx).ManagerNamespace).Get(ctx, "telepresence-intercept-env", v1.GetOptions{})
-	if err != nil {
-		dlog.Errorf(ctx, "cannot read excluded variables configmap: %v", err)
-		return nil
-	}
-	keysList := strings.TrimSpace(cm.Data["excluded"])
-	if keysList == "" {
-		return nil
-	}
-	return strings.Split(keysList, "\n")
-}
-
-func (s *service) removeExcludedEnvVars(ctx context.Context, envVars map[string]string) map[string]string {
-	keys := getExcludedEnvVars(ctx)
-	for _, key := range keys {
+func (s *service) removeExcludedEnvVars(envVars map[string]string) {
+	for _, key := range s.configWatcher.GetAgentEnv().Excluded {
 		delete(envVars, key)
 	}
-	return envVars
 }
 
 func (s *service) Tunnel(server rpc.Manager_TunnelServer) error {

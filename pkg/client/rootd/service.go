@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -33,7 +32,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/log"
 	"github.com/telepresenceio/telepresence/v2/pkg/pprof"
 	"github.com/telepresenceio/telepresence/v2/pkg/proc"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 	"github.com/telepresenceio/telepresence/v2/pkg/vif"
 )
 
@@ -402,7 +400,7 @@ func (s *Service) startSession(parentCtx context.Context, oi *rpc.NetworkConfig,
 	return reply
 }
 
-func (s *Service) serveGrpc(c context.Context, l net.Listener, tracer common.TracingServer) error {
+func (s *Service) serveGrpc(c context.Context, l net.Listener) error {
 	defer func() {
 		// Error recovery.
 		if perr := derror.PanicToError(recover()); perr != nil {
@@ -410,16 +408,13 @@ func (s *Service) serveGrpc(c context.Context, l net.Listener, tracer common.Tra
 		}
 	}()
 
-	opts := []grpc.ServerOption{
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-	}
+	var opts []grpc.ServerOption
 	cfg := client.GetConfig(c)
 	if mz := cfg.Grpc().MaxReceiveSize(); mz > 0 {
 		opts = append(opts, grpc.MaxRecvMsgSize(int(mz)))
 	}
 	svc := grpc.NewServer(opts...)
 	rpc.RegisterDaemonServer(svc, s)
-	common.RegisterTracingServer(svc, tracer)
 
 	sc := &dhttp.ServerConfig{
 		Handler: svc,
@@ -472,11 +467,6 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tracer, err := tracing.NewTraceServer(c, "root-daemon")
-	if err != nil {
-		return err
-	}
-
 	dlog.Info(c, "---")
 	dlog.Infof(c, "Telepresence %s %s starting...", ProcessName, client.DisplayVersion())
 	dlog.Infof(c, "PID is %d", os.Getpid())
@@ -510,7 +500,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// Add a reload function that triggers on create and write of the config.yml file.
 	g.Go("config-reload", d.configReload)
 	g.Go("session", d.manageSessions)
-	g.Go("server-grpc", func(c context.Context) error { return d.serveGrpc(c, grpcListener, tracer) })
+	g.Go("server-grpc", func(c context.Context) error { return d.serveGrpc(c, grpcListener) })
 	g.Go("metriton", scout.Run)
 	err = g.Wait()
 	if err != nil {

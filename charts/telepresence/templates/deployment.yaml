@@ -30,6 +30,9 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .podSecurityContext | nindent 8 }}
+      {{- if .hostNetwork }}
+      hostNetwork: true
+      {{- end }}
       containers:
         - name: {{ include "traffic-manager.name" $ }}
           securityContext:
@@ -61,12 +64,6 @@ spec:
             value: /var/run/secrets/tls
           {{- else }}
             value: {{ .agentInjector.secret.name }}
-          {{- end }}
-          {{- end }}
-          {{- with .tracing }}
-          {{- if .grpcPort }}
-          - name: TRACING_GRPC_PORT
-            value: {{ .grpcPort | quote }}
           {{- end }}
           {{- end }}
           {{- with .telepresenceAPI }}
@@ -276,10 +273,6 @@ spec:
           {{- if .prometheus.port }}  # 0 is false
           - name: prometheus
             containerPort: {{ .prometheus.port }}
-          {{- end }}
-          {{- with .tracing }}
-          - name: grpc-trace
-            containerPort: {{ .grpcPort }}
           {{- end }}
           {{- with .livenessProbe }}
           livenessProbe:

@@ -182,12 +182,12 @@ endif
 
 ifeq ($(GOHOSTOS),windows)
 WINTUN_VERSION=0.14.1
-$(BUILDDIR)/wintun-$(WINTUN_VERSION)/wintun/bin/$(GOHOSTARCH)/wintun.dll:
+$(BUILDDIR)/wintun-$(WINTUN_VERSION)/wintun/bin/$(GOARCH)/wintun.dll:
 	mkdir -p $(BUILDDIR)
 	curl --fail -L https://www.wintun.net/builds/wintun-$(WINTUN_VERSION).zip -o $(BUILDDIR)/wintun-$(WINTUN_VERSION).zip
 	rm -rf  $(BUILDDIR)/wintun-$(WINTUN_VERSION)
 	unzip $(BUILDDIR)/wintun-$(WINTUN_VERSION).zip -d $(BUILDDIR)/wintun-$(WINTUN_VERSION)
-$(BINDIR)/wintun.dll: $(BUILDDIR)/wintun-$(WINTUN_VERSION)/wintun/bin/$(GOHOSTARCH)/wintun.dll
+$(BINDIR)/wintun.dll: $(BUILDDIR)/wintun-$(WINTUN_VERSION)/wintun/bin/$(GOARCH)/wintun.dll
 	mkdir -p $(@D)
 	cp $< $@
 
@@ -227,7 +227,7 @@ endif
 ifeq ($(GOOS),windows)
 release-binary: $(TELEPRESENCE_INSTALLER)
 	mkdir -p $(RELEASEDIR)
-	cp $(TELEPRESENCE_INSTALLER) $(RELEASEDIR)/telepresence-windows-amd64$(BZIP)
+	cp $(TELEPRESENCE_INSTALLER) $(RELEASEDIR)/telepresence-windows-$(GOARCH)$(BZIP)
 else
 release-binary: $(TELEPRESENCE)
 	mkdir -p $(RELEASEDIR)

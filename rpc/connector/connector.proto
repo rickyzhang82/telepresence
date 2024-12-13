@@ -89,10 +89,6 @@ service Connector {
   // (pending the request) and return them to the caller
   rpc GatherLogs(LogsRequest) returns (LogsResponse);
 
-  // GatherTraces will acquire traces for the various Telepresence components in kubernetes
-  // (pending the request) and save them in a file.
-  rpc GatherTraces(TracesRequest) returns (telepresence.common.Result);
-
   // AddInterceptor tells the connector that a given process is serving a specific
   // intercept. The connector must kill this process when the intercept ends
   rpc AddInterceptor(Interceptor) returns  (google.protobuf.Empty);
@@ -430,14 +426,6 @@ message LogsRequest {
 
   // Directory that the logs will be exported to
   string export_dir = 4;
-}
-
-message TracesRequest {
-  // remote_port is the port to connect to on the targets that traces are collected from.
-  int32 remote_port = 1;
-
-  // tracing_file is the file where the traces are stored.
-  string tracing_file = 2;
 }
 
 message LogsResponse {

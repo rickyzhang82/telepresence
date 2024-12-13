@@ -18,14 +18,13 @@ No intercepts are currently running, we'll connect to the cluster and list the s
 $ telepresence connect
 
   Connecting to traffic manager...
-  Connected to context default (https://<cluster-public-IP>)
+  Connected to context default, namespace default (https://<cluster-public-IP>)
 
 $ telepresence list
 
-  web-app-5d568ccc6b   : ready to intercept (traffic-agent not yet installed)
-  emoji                : ready to intercept (traffic-agent not yet installed)
-  web                  : ready to intercept (traffic-agent not yet installed)
-  web-app-5d568ccc6b   : ready to intercept (traffic-agent not yet installed)
+  web-app: ready to intercept (traffic-agent not yet installed)
+  emoji  : ready to intercept (traffic-agent not yet installed)
+  web    : ready to intercept (traffic-agent not yet installed)
 
 $ curl web-app:80
 

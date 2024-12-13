@@ -100,7 +100,7 @@ func (t *nativeDevice) Close() error {
 	return nil
 }
 
-func (t *nativeDevice) addSubnet(ctx context.Context, pfx netip.Prefix) error {
+func (t *nativeDevice) addSubnet(_ context.Context, pfx netip.Prefix) error {
 	link, err := netlink.LinkByIndex(int(t.interfaceIndex))
 	if err != nil {
 		return fmt.Errorf("failed to find link for interface %s: %w", t.name, err)

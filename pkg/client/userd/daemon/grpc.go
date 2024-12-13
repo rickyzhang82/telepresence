@@ -11,8 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -33,7 +31,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/client/userd"
 	"github.com/telepresenceio/telepresence/v2/pkg/errcat"
 	"github.com/telepresenceio/telepresence/v2/pkg/proc"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 )
 
 func callRecovery(c context.Context, r any, err error) error {
@@ -95,8 +92,6 @@ func (s *service) WithSession(c context.Context, callName string, f func(context
 		defer func() { err = callRecovery(c, recover(), err) }()
 		num := getReqNumber(c)
 		ctx := dgroup.WithGoroutineName(s.sessionContext, fmt.Sprintf("/%s-%d", callName, num))
-		ctx, span := otel.Tracer("").Start(ctx, callName)
-		defer span.End()
 		err = f(ctx, s.session)
 	})
 	return
@@ -239,8 +234,6 @@ func (s *service) CanIntercept(c context.Context, ir *rpc.CreateInterceptRequest
 		scout.Report(c, action, entries...)
 	}()
 	err = s.WithSession(c, "CanIntercept", func(c context.Context, session userd.Session) error {
-		span := trace.SpanFromContext(c)
-		tracing.RecordInterceptSpec(span, ir.Spec)
 		_, result = session.CanIntercept(c, ir)
 		if result == nil {
 			result = &rpc.InterceptResult{Error: common.InterceptError_UNSPECIFIED}
@@ -264,12 +257,7 @@ func (s *service) CreateIntercept(c context.Context, ir *rpc.CreateInterceptRequ
 		scout.Report(c, action, entries...)
 	}()
 	err = s.WithSession(c, "CreateIntercept", func(c context.Context, session userd.Session) error {
-		span := trace.SpanFromContext(c)
-		tracing.RecordInterceptSpec(span, ir.Spec)
 		result = session.AddIntercept(c, ir)
-		if result != nil && result.InterceptInfo != nil {
-			tracing.RecordInterceptInfo(span, result.InterceptInfo)
-		}
 		entries, ok = s.scoutInterceptEntries(c, ir.GetSpec(), result)
 		return nil
 	})
@@ -518,14 +506,6 @@ func (s *service) GetNamespaces(ctx context.Context, req *rpc.GetNamespacesReque
 	}
 
 	return &resp, nil
-}
-
-func (s *service) GatherTraces(ctx context.Context, request *rpc.TracesRequest) (result *common.Result, err error) {
-	err = s.WithSession(ctx, "GatherTraces", func(ctx context.Context, session userd.Session) error {
-		result = session.GatherTraces(ctx, request)
-		return nil
-	})
-	return
 }
 
 func (s *service) TrafficManagerVersion(ctx context.Context, _ *empty.Empty) (vi *common.VersionInfo, err error) {

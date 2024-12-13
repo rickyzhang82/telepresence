@@ -105,7 +105,7 @@ func quitDockerDaemons(ctx context.Context) {
 func ExistingDaemon(ctx context.Context, info *daemon.Info) (context.Context, error) {
 	var err error
 	var conn *grpc.ClientConn
-	if info.InDocker && !proc.RunningInContainer() {
+	if info.InDocker {
 		// The host relies on that the daemon has exposed a port to localhost
 		// We must use an IP here to avoid that a IPv6 zone is picked up and incorrectly
 		// parsed by the gRPC dns resolver. See https://github.com/grpc/grpc-go/issues/7882
@@ -200,21 +200,20 @@ func DiscoverDaemon(ctx context.Context, match *regexp.Regexp, daemonID *daemon.
 
 func launchConnectorDaemon(ctx context.Context, connectorDaemon string, required bool) (context.Context, error) {
 	cr := daemon.GetRequest(ctx)
-	cliInContainer := proc.RunningInContainer()
-	daemonID, err := daemon.IdentifierFromFlags(ctx, cr.Name, cr.KubeFlags, cr.KubeconfigData, cr.Docker || cliInContainer)
+	daemonID, err := daemon.IdentifierFromFlags(ctx, cr.Name, cr.KubeFlags, cr.KubeconfigData, cr.Docker)
 	if err != nil {
 		return ctx, err
 	}
 
-	// Try dialing the host daemon using the well known socket.
+	// Try dialing the host daemon using the well-known socket.
 	ctx, err = DiscoverDaemon(ctx, cr.Use, daemonID)
 	if err == nil {
 		ud := daemon.GetUserClient(ctx)
-		if ud.Containerized() && !cliInContainer {
+		if ud.Containerized() {
 			ctx = docker.EnableClient(ctx)
 			cr.Docker = true
 		}
-		if ud.Containerized() == (cr.Docker || cliInContainer) {
+		if ud.Containerized() == cr.Docker {
 			return ctx, nil
 		}
 		// A daemon running on the host does not fulfill a request for a containerized daemon. They can
@@ -237,7 +236,7 @@ func launchConnectorDaemon(ctx context.Context, connectorDaemon string, required
 	}
 
 	var conn *grpc.ClientConn
-	if cr.Docker && !cliInContainer {
+	if cr.Docker {
 		// Ensure that the logfile is present before the daemon starts so that it isn't created with
 		// permissions from the docker container.
 		logDir := filelocation.AppUserLogDir(ctx)
@@ -261,17 +260,11 @@ func launchConnectorDaemon(ctx context.Context, connectorDaemon string, required
 		}
 		if proc.IsAdmin() {
 			// No use having multiple daemons when running as root.
-			hn, err := os.Hostname()
-			if err != nil {
-				hn = "unknown"
-			}
 			args = append(args, "--embed-network")
-			args = append(args, "--name", "docker-"+hn)
 		}
 		dlog.Debugf(ctx, "Creating daemon info file %s (runs on host, or both CLI and daemon runs in container)", daemonID.Name)
 		err = daemon.SaveInfo(ctx,
 			&daemon.Info{
-				InDocker:     cliInContainer,
 				DaemonPort:   0,
 				Name:         daemonID.Name,
 				KubeContext:  daemonID.KubeContext,
@@ -372,7 +365,7 @@ func EnsureSession(ctx context.Context, useLine string, required bool) (context.
 func connectSession(ctx context.Context, useLine string, userD daemon.UserClient, request *daemon.Request, required bool) (*daemon.Session, error) {
 	var ci *connector.ConnectInfo
 	var err error
-	if userD.Containerized() && !proc.RunningInContainer() {
+	if userD.Containerized() {
 		patcher.AnnotateConnectRequest(&request.ConnectRequest, docker.TpCache, userD.DaemonID().KubeContext)
 	}
 	session := func(ci *connector.ConnectInfo, started bool) *daemon.Session {

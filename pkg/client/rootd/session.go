@@ -21,7 +21,6 @@ import (
 	"github.com/blang/semver/v4"
 	dns2 "github.com/miekg/dns"
 	"github.com/puzpuzpuz/xsync/v3"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -290,9 +289,7 @@ func connectToUserDaemon(c context.Context) (*grpc.ClientConn, connector.Manager
 	defer cancel()
 
 	var conn *grpc.ClientConn
-	conn, err := socket.Dial(tc, socket.UserDaemonPath(c), true,
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-	)
+	conn, err := socket.Dial(tc, socket.UserDaemonPath(c), true)
 	var mgrVer semver.Version
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

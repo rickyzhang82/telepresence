@@ -11,9 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	core "k8s.io/api/core/v1"
@@ -32,7 +29,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/agentconfig"
 	"github.com/telepresenceio/telepresence/v2/pkg/agentmap"
 	"github.com/telepresenceio/telepresence/v2/pkg/errcat"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 )
 
 // PrepareIntercept ensures that the given request can be matched against the intercept configuration of
@@ -57,9 +53,6 @@ func (s *state) PrepareIntercept(
 			dlog.Errorf(ctx, "%+v", err)
 		}
 	}()
-	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "state.PrepareIntercept")
-	defer tracing.EndAndRecord(span, err)
-	span.SetAttributes(attribute.Stringer("request", cr))
 
 	interceptError := func(err error) (*managerrpc.PreparedIntercept, error) {
 		if _, ok := status.FromError(err); ok {
@@ -207,13 +200,6 @@ func (s *state) RestoreAppContainer(ctx context.Context, ii *managerrpc.Intercep
 	spec := ii.Spec
 	n := spec.Agent
 	ns := spec.Namespace
-	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "state.RestoreAppContainer", trace.WithAttributes(
-		attribute.String("tel2.name", n),
-		attribute.String("tel2.namespace", ns),
-	))
-	defer func() {
-		tracing.EndAndRecord(span, err)
-	}()
 	mm := mutator.GetMap(ctx)
 	return mm.Update(ctx, ns, func(cm *core.ConfigMap) (changed bool, err error) {
 		y, ok := cm.Data[n]

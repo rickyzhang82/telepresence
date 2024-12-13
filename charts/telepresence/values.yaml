@@ -31,6 +31,11 @@ podAnnotations: {}
 
 podLabels: {}
 
+# Sets the spec.template.spec.hostNetwork for the Traffic Manager.
+# Set this to true when using Calico on AWS EKS to ensure that the mutating webhook can
+# communicate with the traffic manager.
+hostNetwork: false
+
 podSecurityContext: {}
   # fsGroup: 2000
 
@@ -210,17 +215,6 @@ telepresenceAPI:
   # The port on agent's localhost where the API service can be found
   # Default: 0
   port: 0
-
-
-################################################################################
-## Tracing configuration
-################################################################################
-tracing: {}
-  # The port on which a grpc server will be exposed for traces
-  # To enable, set tracing to
-  #
-  # tracing:
-  #   grpcPort: 15766
 
 ################################################################################
 ## Prometheus Server Configuration

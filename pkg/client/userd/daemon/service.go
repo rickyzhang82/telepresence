@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,7 +20,6 @@ import (
 	"github.com/datawire/dlib/dgroup"
 	"github.com/datawire/dlib/dhttp"
 	"github.com/datawire/dlib/dlog"
-	"github.com/telepresenceio/telepresence/rpc/v2/common"
 	rpc "github.com/telepresenceio/telepresence/rpc/v2/connector"
 	"github.com/telepresenceio/telepresence/rpc/v2/manager"
 	"github.com/telepresenceio/telepresence/v2/pkg/client"
@@ -37,7 +35,6 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/log"
 	"github.com/telepresenceio/telepresence/v2/pkg/pprof"
 	"github.com/telepresenceio/telepresence/v2/pkg/proc"
-	"github.com/telepresenceio/telepresence/v2/pkg/tracing"
 )
 
 const titleName = "Connector"
@@ -107,11 +104,6 @@ func NewService(ctx context.Context, _ *dgroup.Group, cfg client.Config, srv *gr
 		// The podd daemon never registers the gRPC servers
 		rpc.RegisterConnectorServer(srv, s)
 		rpc.RegisterManagerProxyServer(srv, s.managerProxy)
-		tracer, err := tracing.NewTraceServer(ctx, "user-daemon")
-		if err != nil {
-			return nil, err
-		}
-		common.RegisterTracingServer(srv, tracer)
 	} else {
 		s.rootSessionInProc = true
 		s.quit = func() {}
@@ -460,9 +452,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	// when the group is cancelled.
 	siCh := make(chan userd.Service)
 	g.Go("service", func(c context.Context) error {
-		opts := []grpc.ServerOption{
-			grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		}
+		var opts []grpc.ServerOption
 		if mz := cfg.Grpc().MaxReceiveSize(); mz > 0 {
 			opts = append(opts, grpc.MaxRecvMsgSize(int(mz)))
 		}

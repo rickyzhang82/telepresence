@@ -511,7 +511,7 @@ func (s *Server) flushDNS() {
 }
 
 // splitToUDPAddr splits the given address into an UDPAddr. It's
-// an  error if the address is based on a hostname rather than an IP.
+// an error if the address is based on a hostname rather than an IP.
 func splitToUDPAddr(netAddr net.Addr) (*net.UDPAddr, error) {
 	ip, port, err := iputil.SplitToIPPort(netAddr)
 	if err != nil {
@@ -620,7 +620,7 @@ func (s *Server) resolveWithRecursionCheck(q *dns.Question) (dnsproxy.RRs, int, 
 // entry is found that hasn't expired, it's returned. If not, this function will call
 // resolveQuery() to resolve and store in the case.
 func (s *Server) resolveThruCache(q *dns.Question) (answer dnsproxy.RRs, rCode int, err error) {
-	dv := &cacheEntry{wait: make(chan struct{}), created: time.Now()}
+	dv := &cacheEntry{wait: make(chan struct{}), created: time.Now(), rCode: -1}
 	key := cacheKey{name: q.Name, qType: q.Qtype}
 	if oldDv, loaded := s.cache.LoadOrStore(key, dv); loaded {
 		if atomic.LoadInt32(&s.recursive) == recursionDetected && atomic.LoadInt32(&oldDv.currentQType) == int32(q.Qtype) {
@@ -629,7 +629,7 @@ func (s *Server) resolveThruCache(q *dns.Question) (answer dnsproxy.RRs, rCode i
 			return nil, dns.RcodeNameError, nil
 		}
 		<-oldDv.wait
-		if !oldDv.expired() {
+		if oldDv.rCode >= 0 && !oldDv.expired() {
 			qTypes := []uint16{q.Qtype}
 			if q.Qtype != dns.TypeCNAME {
 				// Allow additional CNAME records if they are present.
@@ -647,17 +647,13 @@ func (s *Server) resolveThruCache(q *dns.Question) (answer dnsproxy.RRs, rCode i
 
 	atomic.StoreInt32(&dv.currentQType, int32(q.Qtype))
 	defer func() {
-		if rCode != dns.RcodeSuccess {
-			s.cache.Delete(key) // Don't cache unless the lookup succeeded.
-		} else {
-			dv.answer = answer
-			dv.rCode = rCode
+		dv.answer = answer
+		dv.rCode = rCode
 
-			// Return a result for the correct query type. The result will be nil (nxdomain) if nothing was found. It might
-			// also be empty if no RRs were found for the given query type and that is OK.
-			// See https://datatracker.ietf.org/doc/html/rfc4074#section-3
-			answer = copyRRs(answer, []uint16{q.Qtype})
-		}
+		// Return a result for the correct query type. The result will be nil (nxdomain) if nothing was found. It might
+		// also be empty if no RRs were found for the given query type and that is OK.
+		// See https://datatracker.ietf.org/doc/html/rfc4074#section-3
+		answer = copyRRs(answer, []uint16{q.Qtype})
 		atomic.StoreInt32(&dv.currentQType, int32(dns.TypeNone))
 		dv.close()
 	}()

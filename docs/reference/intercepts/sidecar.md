@@ -1,7 +1,7 @@
 ---
 title: Traffic Agent Sidecar
 ---
-# Intercepts
+# Traffic Agent Sidecar
 
 When intercepting a service, the Telepresence Traffic Manager ensures
 that a Traffic Agent has been injected into the intercepted workload.
@@ -18,8 +18,38 @@ the intercepted service.
 
 Kubernetes has various
 [workloads](https://kubernetes.io/docs/concepts/workloads/).
-Currently, Telepresence supports intercepting (installing a
-traffic-agent on) `Deployments`, `ReplicaSets`, `StatefulSets`, and `ArgoRollouts`.
+Currently, Telepresence supports installing a
+Traffic Agent container on `Deployments`, `ReplicaSets`, `StatefulSets`, and `ArgoRollouts`. A Traffic Agent is
+installed the first time a user makes a `telepresence ingest WORKLOAD`, `telepresence intercept WORKLOAD`, or a
+`telepresence connect --proxy-via CIDR=WORKLAOD`.
+
+A Traffic Agent may also be installed up front by adding a `telepresence.getambassador.io/inject-traffic-agent: enabled`
+annotation to the WORKLOADS pod template.
+
+### Sidecar injection
+
+The actual installation of the Traffic Agent is performed by a mutating admission webhook that calls the agent-injector
+service in the Traffic Manager's namespace.
+
+The configuration for the sidecar, which is automatically generated, resides in the configmap `telepresence-agents`.
+
+### Uninstalling the Traffic Agent
+
+A Traffic Agent will normally remain in the workload's pods once it has been installed. It can be explicitly removed by
+issuing the command `telepresence uninstall WORKLOAD`. It will also be removed if its configuration is removed
+from the `telepresence-agents` configmap.
+
+Removing the `telepresence-agents` configmap will effectively uninstall all injected Traffic Agents from the same
+namespace.
+
+> [!NOTE]
+> Uninstalling will not work if the Traffic Agent is installed using the pod template annotation.
+
+### Disable Traffic Agent in a workload
+
+The Traffic Agent installation can be completely disabled by adding a `telepresence.getambassador.io/inject-traffic-agent: disabled`
+annotation to the WORKLOADS pod template. This will prevent all attempts to do anything with the workload that will
+require a Traffic Agent.
 
 ### Disable workloads
 

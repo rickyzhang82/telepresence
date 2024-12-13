@@ -6,10 +6,6 @@ import (
 	"net"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
@@ -124,22 +120,11 @@ func forwardTCP(ctx context.Context, streamCreator tunnel.StreamCreator, fr *tcp
 	var ep tcpip.Endpoint
 	var err tcpip.Error
 	id := fr.ID()
-
-	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "TCPHandler",
-		trace.WithNewRoot(),
-		trace.WithAttributes(
-			attribute.String("tel2.remote-ip", id.RemoteAddress.String()),
-			attribute.String("tel2.local-ip", id.LocalAddress.String()),
-			attribute.Int("tel2.local-port", int(id.LocalPort)),
-			attribute.Int("tel2.remote-port", int(id.RemotePort)),
-		))
 	defer func() {
 		if err != nil {
 			msg := fmt.Sprintf("forward TCP %s: %s", idStringer(id), err)
-			span.SetStatus(codes.Error, msg)
 			dlog.Error(ctx, msg)
 		}
-		span.End()
 	}()
 
 	wq := waiter.Queue{}
@@ -209,19 +194,7 @@ var blockedUDPPorts = map[uint16]bool{ //nolint:gochecknoglobals // constant
 
 func forwardUDP(ctx context.Context, streamCreator tunnel.StreamCreator, fr *udp.ForwarderRequest) {
 	id := fr.ID()
-	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "UDPHandler",
-		trace.WithNewRoot(),
-		trace.WithAttributes(
-			attribute.String("tel2.remote-ip", id.RemoteAddress.To4().String()),
-			attribute.String("tel2.local-ip", id.LocalAddress.To4().String()),
-			attribute.Int("tel2.local-port", int(id.LocalPort)),
-			attribute.Int("tel2.remote-port", int(id.RemotePort)),
-			attribute.Bool("tel2.port-blocked", false),
-		))
-	defer span.End()
-
 	if _, ok := blockedUDPPorts[id.LocalPort]; ok {
-		span.SetAttributes(attribute.Bool("tel2.port-blocked", true))
 		return
 	}
 
@@ -229,7 +202,6 @@ func forwardUDP(ctx context.Context, streamCreator tunnel.StreamCreator, fr *udp
 	ep, err := fr.CreateEndpoint(&wq)
 	if err != nil {
 		msg := fmt.Sprintf("forward UDP %s: %s", idStringer(id), err)
-		span.SetStatus(codes.Error, msg)
 		dlog.Error(ctx, msg)
 		return
 	}
