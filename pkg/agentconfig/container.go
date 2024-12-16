@@ -200,6 +200,10 @@ func firstAppSecurityContext(pod *core.Pod, config *Sidecar) (*core.SecurityCont
 }
 
 func InitContainer(config *Sidecar) *core.Container {
+	boolPointer := func(b bool) *bool {
+		return &b
+	}
+
 	ic := &core.Container{
 		Name:  InitContainerName,
 		Image: config.AgentImage,
@@ -227,6 +231,7 @@ func InitContainer(config *Sidecar) *core.Container {
 			Capabilities: &core.Capabilities{
 				Add: []core.Capability{"NET_ADMIN"},
 			},
+			RunAsNonRoot: boolPointer(false),
 		},
 	}
 	if r := config.InitResources; r != nil {
