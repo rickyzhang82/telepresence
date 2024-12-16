@@ -203,7 +203,7 @@ func InitContainer(config *Sidecar) *core.Container {
 	boolPointer := func(b bool) *bool {
 		return &b
 	}
-
+	boolInt64 := func(i int64) *int64 { return &i }
 	ic := &core.Container{
 		Name:  InitContainerName,
 		Image: config.AgentImage,
@@ -232,6 +232,7 @@ func InitContainer(config *Sidecar) *core.Container {
 				Add: []core.Capability{"NET_ADMIN"},
 			},
 			RunAsNonRoot: boolPointer(false),
+			RunAsUser:    boolInt64(0),
 		},
 	}
 	if r := config.InitResources; r != nil {
